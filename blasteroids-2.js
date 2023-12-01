@@ -1,6 +1,7 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
-// const acl = new Accelerometer({ frequency: 60 }); // mobile
+
+const MOBILE = !window.DeviceOrientationEvent; // should be the opposite but reversed for some reason TODO: why?
 
 // constants 
 const FPS = 60
@@ -110,27 +111,42 @@ class Player extends GameObject {
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
   registerInputs = () => {
-    document.addEventListener('mousemove', this._acquireTarget);
-    document.addEventListener('mousedown', this._fireProjectile);
-    document.addEventListener('touchstart', this._fireProjectileTouch);
-    document.addEventListener('keydown', this._boostOn);
-    document.addEventListener('keyup', this._boostOff);
+    if (MOBILE) {
+      window.addEventListener('touchstart', this._onTouchStart);
+      window.addEventListener('orientationchange', this._onTilt);
+    } else {
+      window.addEventListener('mousemove', this._onMouseMove);
+      window.addEventListener('mousedown', this._onMouseDown);
+      window.addEventListener('keydown', this._onKeyDown);
+      window.addEventListener('keyup', this._onKeyUp);
+    }
   }
   deregisterInputs = () => {
-    document.removeEventListener('mousemove', this._acquireTarget);
-    document.removeEventListener('mousedown', this._fireProjectile);
-    document.removeEventListener('touchstart', this._fireProjectileTouch);
-    document.removeEventListener('keydown', this._boostOn);
-    document.removeEventListener('keyup', this._boostOff);
+    if (MOBILE) { 
+      window.removeEventListener('touchstart', this._onTouchStart);
+      window.removeEventListener('orientationchange', this._onTilt);
+    } else {
+      window.removeEventListener('mousemove', this._onMouseMove);
+      window.removeEventListener('mousedown', this._onMouseDown);
+      window.removeEventListener('keydown', this._onKeyDown);
+      window.removeEventListener('keyup', this._onKeyUp);
+    }
   }
-  _acquireTarget = (event) => { this.target = new Vector2(event.x, event.y) }
-  _fireProjectile = (event) => { if (event.button === 0) this.firing = true }
-  _fireProjectileTouch = (event) => {
+  _onTouchStart = (event) => {
     this.target = new Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.firing = true;
   }
-  _boostOn = (event) => { this.boosting = event.key === ' ' }
-  _boostOff = (event) => { this.boosting = !event.key === ' ' }
+  _onTilt = (event) => {
+    alert(event);
+    // if (event.gamma !== 0 && event.beta !== 0) alert('Tilted!');
+    // // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+    // this.vel.x = event.gamma / 90 * this.accel * this.game.deltaTime; // gamma = [-90, 90)
+    // this.vel.y = event.beta / 180 * this.accel * this.game.deltaTime; // beta = [-180, 180)
+  }
+  _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
+  _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
+  _onKeyDown = (event) => { this.boosting = event.key === ' ' }
+  _onKeyUp = (event) => { this.boosting = !event.key === ' ' }
 
   _safeUpdateVelocity = (v) => {
     v *= (1 - this.frict)
@@ -208,9 +224,12 @@ class Game {
     this.nextObjectId = -1; // will increment to 0 on first registration
     this.cleanupIds = [];
     // inputs
-    this.waitingForDoubleTap = false;
-    document.addEventListener('touchstart', this._handleTouchInput);
-    document.addEventListener('keydown', this._handleKeyInput);
+    if (MOBILE) {
+      this.waitingForDoubleTap = false;
+      window.addEventListener('touchstart', this._handleTouchInput);
+    } else {
+      window.addEventListener('keydown', this._handleKeyInput);
+    }
     // start game
     this.newGame();
     this.frameReq = requestAnimationFrame(this.run);
@@ -269,7 +288,7 @@ class Game {
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = 2500;
-    this.spawnAsteroid(0);
+    this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, 0);
   }
 
   spawnAsteroid = (size) => { // spawns a new asteroid on a decreasing timer
