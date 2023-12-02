@@ -1,29 +1,32 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
  
+// mobile settings
+const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
+const DTAP_TIMEOUT = 250; // timeout for double-tap
+const TILT_THRESH = 0.45; // minimum tilt to move the player
+const TILT_OFFSET = -25; // offset for y-axis so device can be held at a natural angle
+
 // game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const LINE_COLOR = '#FFF';
-const DEBUG = true;
-const FONT_SIZE = 30;
+const DEBUG = false;
+const FONT_SIZE = MOBILE ? 60 : 30;
 const PADDING = 10;
-
-// mobile settings
-const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
-const DTAP_TIMEOUT = 500; // timeout for double-tap
-const TILT_THRESH = 0.25;
 
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
-const PLAYER_R = 20 // player radius (reminder: this is only HALF the player size)
-const PLAYER_V = 12 // player max vel
+const PLAYER_R = MOBILE ? 32 : 16; // player radius (reminder: this is only HALF the player size)
+const PLAYER_V = 12; // player max vel
+const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration
+const PLAYER_F = MOBILE ? 0.03 : 0.02; // player friction
 const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PROJ_V = 1; // projectile speed
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
-const ROCK_R = 40; // asteroid radius
+const ROCK_R = MOBILE ? 64 : 32; // asteroid radius
 const ROCK_V = 0.3; // asteroid speed
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) }
@@ -105,14 +108,14 @@ class Player extends GameObject {
   constructor(game) {
     resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
     super(game, new Vector2(canvas.width/2, canvas.height/2));
-    this.accel = 0.02;
-    this.frict = 0.02;
+    this.accel = PLAYER_A;
+    this.frict = PLAYER_F;
     this.theta = 0;
     this.radius = PLAYER_R;
     this.target = null;
     this.firing = false;
     this.boosting = false;
-    this.tilt = new Vector2(); // track device tilt on mobile to trigger boosting; initialized as (0, 0) for debug purposes
+    this.tilt = new Vector2(); // track device tilt on mobile to trigger movement
     this.registerInputs();
   }
 
@@ -145,10 +148,8 @@ class Player extends GameObject {
     this.firing = true;
   }
   _onDeviceOrientation = (event) => {
-    // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
-    // this.vel.x = event.gamma / 90 * this.accel * this.game.deltaTime; // gamma = [-90, 90)
-    // this.vel.y = event.beta / 180 * this.accel * this.game.deltaTime; // beta = [-180, 180)
     this.tilt = new Vector2(event.gamma, event.beta);
+    if (!this.neutral) this.neutral = this.tilt;
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -173,9 +174,11 @@ class Player extends GameObject {
       new Projectile(this.game, this.loc, this.theta-T_OFFSET);
       this.firing = false;
     }
-    // apply velocity
-    if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime); // desktop
-    else if (Math.abs(this.tilt.x) > TILT_THRESH | Math.abs(this.tilt.y) > TILT_THRESH) this.vel.add(this.tilt.x, this.tilt.y, this.game.deltaTime); // mobile
+    // apply velocity    
+    if (MOBILE && Math.abs(this.tilt.x) > TILT_THRESH | Math.abs(this.tilt.y+TILT_OFFSET) > TILT_THRESH) {
+      this.vel.add(this.tilt.x, this.tilt.y+TILT_OFFSET, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
+    } // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+    if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
@@ -300,7 +303,7 @@ class Game {
   }
 
   spawnAsteroid = (size) => { // spawns a new asteroid on a decreasing timer
-    if (!this.gameOver && !MOBILE) {
+    if (!this.gameOver) {
       let x = null;
       let y = null;
       if (randomChoice([true, false])) { 
@@ -339,11 +342,10 @@ class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     displayText(this.score, PADDING, PADDING + FONT_SIZE);
     if (this.gameOver) displayText('GAME OVER', this.player.loc.x, this.player.loc.y);
-    if (DEBUG) {
+    if (DEBUG && this.player.tilt) {
       displayText('x:'+this.player.tilt.x, PADDING, canvas.height-FONT_SIZE*2);
       displayText('y:'+this.player.tilt.y, PADDING, PADDING + canvas.height-FONT_SIZE);
     }
-
   } 
 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
