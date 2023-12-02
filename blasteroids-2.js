@@ -1,32 +1,33 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
+
+const DEBUG = false; // the one and only
+const DEBUG_ID = 'DEBUG 1'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 const DTAP_TIMEOUT = 250; // timeout for double-tap
 const TILT_THRESH = 0.45; // minimum tilt to move the player
-const TILT_OFFSET = -25; // offset for y-axis so device can be held at a natural angle
 
 // game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const LINE_COLOR = '#FFF';
-const DEBUG = false;
-const FONT_SIZE = MOBILE ? 60 : 30;
+const FONT_SIZE = 30;
 const PADDING = 10;
 
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
-const PLAYER_R = MOBILE ? 32 : 16; // player radius (reminder: this is only HALF the player size)
+const PLAYER_R = 16; // player radius (reminder: this is only HALF the player size)
 const PLAYER_V = 12; // player max vel
-const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration
-const PLAYER_F = MOBILE ? 0.03 : 0.02; // player friction
+const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration; mobile needs more because of different inputs
+const PLAYER_F = 0.02; // player friction
 const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PROJ_V = 1; // projectile speed
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
-const ROCK_R = MOBILE ? 64 : 32; // asteroid radius
+const ROCK_R = 32; // asteroid radius
 const ROCK_V = 0.3; // asteroid speed
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) }
@@ -116,6 +117,7 @@ class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement
+    this.neutral = null;
     this.registerInputs();
   }
 
@@ -149,7 +151,7 @@ class Player extends GameObject {
   }
   _onDeviceOrientation = (event) => {
     this.tilt = new Vector2(event.gamma, event.beta);
-    if (!this.neutral) this.neutral = this.tilt;
+    if (!this.neutral) this.neutral = this.tilt.copy(); // remember starting position as neutral position
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -166,17 +168,19 @@ class Player extends GameObject {
     // rotate towards target
     if (this.target) { 
       this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x) + T_OFFSET;
-      this.theta %= 2 * Math.PI; // radians
-      this.target = null;
+      setTimeout(() => this.target = null, TIME_STEP * 20); // stay on target for the next 20 frames so shots land
+    } else if (this.neutral) {
+      this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) + T_OFFSET;
     }
+    this.theta %= 2 * Math.PI; // radians
     // fire projectile
     if (this.firing) {
       new Projectile(this.game, this.loc, this.theta-T_OFFSET);
       this.firing = false;
     }
     // apply velocity    
-    if (MOBILE && Math.abs(this.tilt.x) > TILT_THRESH | Math.abs(this.tilt.y+TILT_OFFSET) > TILT_THRESH) {
-      this.vel.add(this.tilt.x, this.tilt.y+TILT_OFFSET, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
+    if (MOBILE && this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH) {
+      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
     } // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
@@ -267,15 +271,16 @@ class Game {
   _handlePause = () => {
     this.paused = !this.paused;
     if (this.paused) {
-        cancelAnimationFrame(this.frameReq);
-        clearTimeout(this.asteroidTimer);
-        this.pauseTime = Date.now();
-        displayText('GAME PAUSED', this.player.loc.x, this.player.loc.y);
+      cancelAnimationFrame(this.frameReq);
+      clearTimeout(this.asteroidTimer);
+      this.pauseTime = Date.now();
+      displayText(DEBUG ? DEBUG_ID : 'GAME PAUSED', this.player.loc.x, this.player.loc.y);
     }
     else {
-        this.lastTick += (Date.now() - this.pauseTime);
-        this.spawnAsteroid(0);
-        this.frameReq = requestAnimationFrame(this.run);
+      if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume
+      this.lastTick += (Date.now() - this.pauseTime);
+      this.spawnAsteroid(0);
+      this.frameReq = requestAnimationFrame(this.run);
     }
   }
 
@@ -298,7 +303,7 @@ class Game {
     this.score = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
-    this.timeToImpact = 2500;
+    this.timeToImpact = DEBUG ? 5000 : 2500;
     this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, 0);
   }
 
@@ -317,7 +322,7 @@ class Game {
         case 0: new Asteroid(this, new Vector2(x, y));
         // case 1: new BigAsteroid(this, loc, theta);
       }
-      if (this.timeToImpact > 250) this.timeToImpact -= 25;
+      if (this.timeToImpact > DEBUG ? 500 : 250) this.timeToImpact -= 25;
       this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, 0);
     }
   }
@@ -340,11 +345,11 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    displayText(this.score, PADDING, PADDING + FONT_SIZE);
+    displayText(DEBUG ? 'DEBUG' : this.score, PADDING, PADDING + FONT_SIZE);
     if (this.gameOver) displayText('GAME OVER', this.player.loc.x, this.player.loc.y);
-    if (DEBUG && this.player.tilt) {
-      displayText('x:'+this.player.tilt.x, PADDING, canvas.height-FONT_SIZE*2);
-      displayText('y:'+this.player.tilt.y, PADDING, PADDING + canvas.height-FONT_SIZE);
+    if (DEBUG && this.player.neutral) {
+      displayText('x:'+this.player.neutral.x, PADDING, canvas.height-FONT_SIZE*2);
+      displayText('y:'+this.player.neutral.y, PADDING, PADDING + canvas.height-FONT_SIZE);
     }
   } 
 
