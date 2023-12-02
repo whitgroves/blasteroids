@@ -1,20 +1,27 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
-
-const MOBILE = !window.DeviceOrientationEvent; // should be the opposite but reversed for some reason TODO: why?
-
-// constants 
+ 
+// game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
-const LINE_COLOR = '#FFF'
-const DTAP_TIMEOUT = 500;
+const LINE_COLOR = '#FFF';
+const DEBUG = true;
+const FONT_SIZE = 30;
+const PADDING = 10;
 
+// mobile settings
+const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
+const DTAP_TIMEOUT = 500; // timeout for double-tap
+const TILT_THRESH = 0.25;
+
+// player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
 const PLAYER_R = 20 // player radius (reminder: this is only HALF the player size)
 const PLAYER_V = 12 // player max vel
 const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PROJ_V = 1; // projectile speed
 
+// asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 const ROCK_R = 40; // asteroid radius
 const ROCK_V = 0.3; // asteroid speed
@@ -36,7 +43,7 @@ tracePoints = (points, enclose=true) => {
 }
 
 displayText = (text, x, y) => {
-  ctx.font = '30px Mono';
+  ctx.font = FONT_SIZE+'px Mono';
   ctx.fillStyle = LINE_COLOR;
   ctx.fillText(text, x, y);
 }
@@ -105,6 +112,7 @@ class Player extends GameObject {
     this.target = null;
     this.firing = false;
     this.boosting = false;
+    this.tilt = new Vector2(); // track device tilt on mobile to trigger boosting; initialized as (0, 0) for debug purposes
     this.registerInputs();
   }
 
@@ -113,7 +121,7 @@ class Player extends GameObject {
   registerInputs = () => {
     if (MOBILE) {
       window.addEventListener('touchstart', this._onTouchStart);
-      window.addEventListener('orientationchange', this._onTilt);
+      window.addEventListener('deviceorientation', this._onDeviceOrientation);
     } else {
       window.addEventListener('mousemove', this._onMouseMove);
       window.addEventListener('mousedown', this._onMouseDown);
@@ -124,7 +132,7 @@ class Player extends GameObject {
   deregisterInputs = () => {
     if (MOBILE) { 
       window.removeEventListener('touchstart', this._onTouchStart);
-      window.removeEventListener('orientationchange', this._onTilt);
+      window.removeEventListener('deviceorientation', this._onDeviceOrientation);
     } else {
       window.removeEventListener('mousemove', this._onMouseMove);
       window.removeEventListener('mousedown', this._onMouseDown);
@@ -136,12 +144,11 @@ class Player extends GameObject {
     this.target = new Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.firing = true;
   }
-  _onTilt = (event) => {
-    alert(event);
-    // if (event.gamma !== 0 && event.beta !== 0) alert('Tilted!');
-    // // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+  _onDeviceOrientation = (event) => {
+    // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
     // this.vel.x = event.gamma / 90 * this.accel * this.game.deltaTime; // gamma = [-90, 90)
     // this.vel.y = event.beta / 180 * this.accel * this.game.deltaTime; // beta = [-180, 180)
+    this.tilt = new Vector2(event.gamma, event.beta);
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -167,7 +174,8 @@ class Player extends GameObject {
       this.firing = false;
     }
     // apply velocity
-    if (this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
+    if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime); // desktop
+    else if (Math.abs(this.tilt.x) > TILT_THRESH | Math.abs(this.tilt.y) > TILT_THRESH) this.vel.add(this.tilt.x, this.tilt.y, this.game.deltaTime); // mobile
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
@@ -292,7 +300,7 @@ class Game {
   }
 
   spawnAsteroid = (size) => { // spawns a new asteroid on a decreasing timer
-    if (!this.gameOver) {
+    if (!this.gameOver && !MOBILE) {
       let x = null;
       let y = null;
       if (randomChoice([true, false])) { 
@@ -328,11 +336,14 @@ class Game {
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    this.gameObjects.forEach((gameObj) => {
-      gameObj.render(); 
-    });
-    displayText(this.score, 10, 40);
+    this.gameObjects.forEach((gameObj) => { gameObj.render() });
+    displayText(this.score, PADDING, PADDING + FONT_SIZE);
     if (this.gameOver) displayText('GAME OVER', this.player.loc.x, this.player.loc.y);
+    if (DEBUG) {
+      displayText('x:'+this.player.tilt.x, PADDING, canvas.height-FONT_SIZE*2);
+      displayText('y:'+this.player.tilt.y, PADDING, PADDING + canvas.height-FONT_SIZE);
+    }
+
   } 
 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
