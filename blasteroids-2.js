@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false; // the one and only
-const DEBUG_ID = 'DEBUG 2'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const DEBUG_ID = 'DEBUG 5'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -18,16 +18,16 @@ const PADDING = 10;
 
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
-const PLAYER_R = 16; // player radius (reminder: this is only HALF the player size)
+const PLAYER_R = MOBILE ? 20 : 16; // player radius (reminder: this is only HALF the player size)
 const PLAYER_V = 12; // player max vel
-const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration; mobile needs more because of different inputs
+const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration
 const PLAYER_F = 0.02; // player friction
 const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PROJ_V = 1; // projectile speed
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
-const ROCK_R = 32; // asteroid radius
+const ROCK_R = PLAYER_R * 2; // asteroid radius is always 2x the player
 const ROCK_V = 0.3; // asteroid speed
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
@@ -161,6 +161,7 @@ class Player extends GameObject {
     this.game.gameOver = true;
     this.deregisterInputs();
   }
+  _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH}
   _safeUpdateVelocity = (v) => {
     v *= (1 - this.frict)
     v = Math.max(-PLAYER_V, Math.min(v, PLAYER_V));            
@@ -171,8 +172,8 @@ class Player extends GameObject {
     // rotate towards target
     if (this.target) { 
       this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x) + T_OFFSET;
-      setTimeout(() => this.target = null, TIME_STEP * 20); // stay on target for the next 20 frames so shots land
-    } else if (this.neutral) {
+      setTimeout(() => this.target = null, TIME_STEP * 30); // stay on target for the next 30 frames so shots land
+    } else if (this._isTilted()) {
       this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) + T_OFFSET;
     }
     this.theta %= 2 * Math.PI; // radians
@@ -182,9 +183,10 @@ class Player extends GameObject {
       this.firing = false;
     }
     // apply velocity    
-    if (MOBILE && this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH) {
+    if (MOBILE && this._isTilted()) {
       this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
-    } // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+      // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+    } 
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
