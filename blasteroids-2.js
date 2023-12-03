@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false; // the one and only
-const DEBUG_ID = 'DEBUG 1'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const DEBUG_ID = 'DEBUG 2'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -30,14 +30,14 @@ const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5
 const ROCK_R = 32; // asteroid radius
 const ROCK_V = 0.3; // asteroid speed
 
-getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) }
+getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 
 resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
 
-tracePoints = (points, enclose=true) => {
+tracePoints = (points, enclose=true) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = LINE_COLOR;
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
@@ -88,9 +88,10 @@ class GameObject {
   }
   inBounds = () => { return -this.radius < this.loc.x && this.loc.x < canvas.width+this.radius 
                         && -this.radius < this.loc.y && this.loc.y < canvas.height+this.radius }
+  _onDestroy = () => {} // virtual
+  destroy = () => { this._onDestroy(); this.game.deregister(this.objId); }
   update = () => {} // virtual
   render = () => {} // virtual
-  destroy = () => { this.game.deregister(this.objId) }
 }
 
 class Projectile extends GameObject {
@@ -120,7 +121,6 @@ class Player extends GameObject {
     this.neutral = null;
     this.registerInputs();
   }
-
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
   registerInputs = () => {
@@ -157,7 +157,10 @@ class Player extends GameObject {
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
   _onKeyDown = (event) => { this.boosting = event.key === ' ' }
   _onKeyUp = (event) => { this.boosting = !event.key === ' ' }
-
+  _onDestroy = () => {
+    this.game.gameOver = true;
+    this.deregisterInputs();
+  }
   _safeUpdateVelocity = (v) => {
     v *= (1 - this.frict)
     v = Math.max(-PLAYER_V, Math.min(v, PLAYER_V));            
@@ -187,11 +190,7 @@ class Player extends GameObject {
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
     // collision check
-    if (this.game.checkAsteroidCollision(this)) {
-      this.game.gameOver = true;
-      this.destroy();
-      this.deregisterInputs();
-    }
+    if (this.game.checkAsteroidCollision(this)) this.destroy();
   }
   render = () => {
     var points = [];
@@ -207,14 +206,14 @@ class Player extends GameObject {
 class Asteroid extends GameObject {
   constructor(game, loc, theta=null) {
     super(game, loc);
-    this.theta = theta ? theta % 2 * Math.PI : Math.atan2(loc.y-game.player.loc.y, loc.x-game.player.loc.x); // by default, head towards player
+    this.theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x); // by default, head towards player
     this.vel.set(Math.cos(this.theta), Math.sin(this.theta), ROCK_V);
     this.radius = ROCK_R;
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
   }
   update = () => {
     if (this.inBounds()) {
-      this.loc.add(this.vel.x, this.vel.y, -this.game.deltaTime); // scaled negative to move inward on spawn
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime); // scaled negative to move inward on spawn
     } else {
       this.destroy();
     }
@@ -226,7 +225,19 @@ class Asteroid extends GameObject {
       var y = this.loc.y + this.radius * Math.sin(point + this.theta);
       points.push(new Vector2(x, y));
     });
+    if (DEBUG) points.push(this.loc.copy());
     tracePoints(points);
+  }
+}
+
+class BigAsteroid extends Asteroid {
+  constructor(game, loc, theta=null) {
+    super(game, loc, theta);
+    this.radius *= 2;
+  }
+  _onDestroy = () => {
+    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / 6); // splits into 2 asteroids before destroying itself
+    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / 6); // asteroids have same angle +/- 60 degrees
   }
 }
 
@@ -249,7 +260,6 @@ class Game {
     this.newGame();
     this.frameReq = requestAnimationFrame(this.run);
   }
-
   _handleTouchInput = (event) => {
     event.preventDefault(); // block resize on double-tap
     if (!this.waitingForDoubleTap) {
@@ -259,7 +269,6 @@ class Game {
       if (!this.gameOver) this._handlePause(); // un/pause on double-tap
     }
   }
-
   _handleKeyInput = (event) => {
     if (!this.gameOver && event.key === 'Escape'){
        this._handlePause();
@@ -267,7 +276,6 @@ class Game {
       this.newGame();    
     }
   }
-
   _handlePause = () => {
     this.paused = !this.paused;
     if (this.paused) {
@@ -283,19 +291,15 @@ class Game {
       this.frameReq = requestAnimationFrame(this.run);
     }
   }
-
   register = (gameObj) => {
     this.gameObjects.set(++this.nextObjectId, gameObj);
     return this.nextObjectId;
   }
-
   deregister = (objId) => { this.cleanupIds.push(objId) }
-
   cleanup = () => {
     this.cleanupIds.forEach((objId) => { this.gameObjects.delete(objId) });
     this.cleanupIds = [];
   }
-
   newGame = () => {
     this.paused = false;
     this.pauseTime = null;
@@ -304,10 +308,9 @@ class Game {
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
-    this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, 0);
+    this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
   }
-
-  spawnAsteroid = (size) => { // spawns a new asteroid on a decreasing timer
+  spawnAsteroid = (size=0) => { // spawns a new asteroid then queues the next one on a decreasing timer
     if (!this.gameOver) {
       let x = null;
       let y = null;
@@ -319,18 +322,21 @@ class Game {
         y = randomChoice([0, canvas.height]);
       }
       switch (size) {
-        case 0: new Asteroid(this, new Vector2(x, y));
-        // case 1: new BigAsteroid(this, loc, theta);
+        case 0:
+          new Asteroid(this, new Vector2(x, y));
+          break;
+        case 1:
+          new BigAsteroid(this, new Vector2(x, y));
+          break;
       }
       if (this.timeToImpact > DEBUG ? 500 : 250) this.timeToImpact -= 25;
-      this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, 0);
+      this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
     }
   }
-
   checkAsteroidCollision = (collisionObj) => {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
-      if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < ROCK_R && Math.abs(collisionObj.loc.y-gameObj.loc.y) < ROCK_R) {
+      if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius) {
         gameObj.destroy();
         this.score++;
         return true;
@@ -338,9 +344,7 @@ class Game {
     }
     return false;
   }
-
   update = () => { this.gameObjects.forEach((gameObj) => { gameObj.update() }) }
-
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -352,7 +356,6 @@ class Game {
       displayText('y:'+this.player.neutral.y, PADDING, PADDING + canvas.height-FONT_SIZE);
     }
   } 
-
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     if (!this.paused) {
       this.deltaTime += timestamp - this.lastTick;
