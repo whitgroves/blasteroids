@@ -118,7 +118,7 @@ class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement
-    this.neutral = null;
+    this.neutral = MOBILE ? new Vector2(0, 15) : null; // default neutral tilt is (0, 15) since first update can come in as (0, 0)
     this.registerInputs();
   }
   // generally, each event sets an update flag, then the response is handled during update()
@@ -151,7 +151,7 @@ class Player extends GameObject {
   }
   _onDeviceOrientation = (event) => {
     this.tilt = new Vector2(event.gamma, event.beta);
-    if (!this.neutral) this.neutral = this.tilt.copy(); // remember starting position as neutral position
+    if (!this.neutral) this.neutral = this.tilt.copy(); // remember starting position if one isn't set
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -268,7 +268,8 @@ class Game {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
     } else {
-      if (!this.gameOver) this._handlePause(); // un/pause on double-tap
+      if (this.gameOver) this.newGame(); // double-tap to restart
+      else this._handlePause(); // un/pause on double-tap
     }
   }
   _handleKeyInput = (event) => {
