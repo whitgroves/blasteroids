@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false; // the one and only
-const DEBUG_ID = 'DEBUG 5'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const DEBUG_ID = 'TBD'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -14,8 +14,11 @@ const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const LINE_COLOR = '#FFF';
 const LINE_WIDTH = MOBILE ? 3 : 2;
-const FONT_SIZE = 30;
+const FONT_SIZE = MOBILE ? 45 : 30;
+const FONT_FAM = 'monospace';
 const PADDING = 10;
+const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
+const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
 
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
@@ -50,17 +53,19 @@ tracePoints = (points, enclose=true) => { // points is an array of Vector2 (see 
 }
 
 displayText = (text, x, y, color=LINE_COLOR) => {
-  ctx.font = FONT_SIZE+'px Mono';
+  ctx.font = FONT_SIZE+'px '+FONT_FAM;
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
 }
 
 displayTextBox = (textLines, x, y) => {
   lineLengths = textLines.map((text) => text.length);
-  let xscale = Math.max(...lineLengths) * FONT_SIZE / 3.1;
+  let xscale = Math.max(...lineLengths) * FONT_SIZE * XSCALE_F;
+  let yscale = textLines.length * FONT_SIZE * YSXALE_F;
+  x = Math.max(xscale, Math.min(x, canvas.width-xscale-PADDING)); // keep box in-bounds
+  y = Math.max(yscale, Math.min(y, canvas.height-yscale-PADDING));
   let xLeft = x - xscale;
   let xRight = x + xscale;
-  let yscale = textLines.length * FONT_SIZE / 1.4;
   let yTop = y - yscale;
   let yBottom = y + yscale;
   box = [new Vector2(xLeft, yTop), new Vector2(xRight, yTop), new Vector2(xRight, yBottom), new Vector2(xLeft, yBottom)];
@@ -300,7 +305,7 @@ class Game {
     if (!this.gameOver && event.key === 'Escape'){
        this._handlePause();
     } else if (this.gameOver && event.key === 'Escape') {
-      this.newGame();    
+      this.newGame();
     }
   }
   _handlePause = () => {
@@ -309,13 +314,12 @@ class Game {
       cancelAnimationFrame(this.frameReq);
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
-      // displayText('YOU ARE HERE', this.player.loc.x, this.player.loc.y);
       let pauseText = [
         'YOU ARE HERE',
+        (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-        MOBILE ? 'UNPAUSE TO CALIBRATE' : 'SPACE TO MOVE',
-        (MOBILE ? 'DOUBLE TAP' : 'ESC') + ' TO UNPAUSE',
-        randomChoice(['GOOD LUCK', 'GODSPEED', 'LOCK IN', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'SINCERELY,'])
+        (MOBILE ? 'DOUBLE TAP' : 'ESC') + ' TO RESUME',
+        DEBUG ? DEBUG_ID : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,'])
       ]
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
@@ -369,7 +373,7 @@ class Game {
           new BigAsteroid(this, new Vector2(x, y));
           break;
       }
-      if (this.timeToImpact > DEBUG ? 500 : 250) this.timeToImpact -= 25;
+      if (this.timeToImpact > (DEBUG ? 5000 : 1000)) this.timeToImpact -= 25;
       this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
     }
   }
@@ -393,26 +397,32 @@ class Game {
     if (this.gameOver){
       if (!this.gameOverText) {
         let rank = 'D';
-        let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'TRY HARDER']);
-        let sharpshooter = (this.money >= this.score * 0.7);
-        if (sharpshooter) comment = randomChoice(["NICE SHOOTIN' TEX", 'ZONED IN']);
+        let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
+        let sharpshooter = (this.score >= 25 && this.money >= this.score * 0.7);
+        let broke = (this.money === 0);
         if (this.score >= 100) {
-          if (sharpshooter) {
+          if (sharpshooter || this.score > 300) {
             rank = 'S';
-            comment = randomChoice(['MISSION COMPLETE', 'SHOW OFF', 'INHUMAN', 'SEEK HELP']);
+            comment = randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'TARTARE']);
           }
           else {
             rank = 'A';
-            comment = randomChoice(['TOP NOTCH', 'RESPECTABLE', 'GOOD JOB', 'TARTARE']);
+            comment = this.score >= 200 
+              ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) // A+
+              : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
           }
-        } else if (this.score >= 50) {
-          rank = 'B';
-          comment = randomChoice(['SOLID', 'PRETTY GOOD', 'SKILLED', 'WELL DONE']);
-        } else if (this.score >= 25) {
-          rank = 'C';
-          comment = randomChoice(['NOT BAD', 'HEATING UP', 'DECENT', 'MEDIUM WELL']);
+          if (broke) comment = 'ENLIGHTENED, YOU ARE';
+        } else {
+          if (this.score >= 75) {
+            rank = 'B';
+            comment = randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
+          } else if (this.score >= 50) {
+            rank = 'C';
+            comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
+          }
+          if (sharpshooter) comment = randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE']);
+          if (broke) comment = 'I HOPE YOU LIKE RAMEN';
         }
-        if (this.money === 0) comment = randomChoice(['ENLIGHTENED, YOU ARE', 'I HOPE YOU LIKE RAMEN', comment]);
         this.gameOverText = [
           'GAME OVER',
           'SCORE: '+this.score,
