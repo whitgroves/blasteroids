@@ -13,6 +13,7 @@ const TILT_THRESH = 0.45; // minimum tilt to move the player
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const LINE_COLOR = '#FFF';
+const LINE_WIDTH = MOBILE ? 3 : 2;
 const FONT_SIZE = 30;
 const PADDING = 10;
 
@@ -24,6 +25,7 @@ const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration
 const PLAYER_F = 0.02; // player friction
 const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PROJ_V = 1; // projectile speed
+const PROJ_L = 10; // projectile length
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
@@ -40,6 +42,7 @@ resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canva
 tracePoints = (points, enclose=true) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = LINE_COLOR;
+  ctx.lineWidth = LINE_WIDTH;
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
   points.forEach(point => { ctx.lineTo(point.x, point.y) });
   ctx.stroke();
@@ -103,7 +106,7 @@ class Projectile extends GameObject {
       this.destroy();
     }
   }
-  render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x, this.loc.y-this.vel.y)], false) }
+  render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false) }
 }
 
 class Player extends GameObject {
