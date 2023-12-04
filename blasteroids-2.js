@@ -398,30 +398,29 @@ class Game {
       if (!this.gameOverText) {
         let rank = 'D';
         let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
-        let sharpshooter = (this.score >= 25 && this.money >= this.score * 0.7);
+        let sharpshooter = (this.score >= 25 && this.money >= this.score * 0.6); // TODO: update how this is measured
         let broke = (this.money === 0);
-        if (this.score >= 100) {
-          if (sharpshooter || this.score > 300) {
+        if (this.score >= 120) {
+          if (sharpshooter || this.broke || this.score >= 300) {
             rank = 'S';
-            comment = randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'TARTARE']);
+            comment = broke ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
           }
           else {
             rank = 'A';
-            comment = this.score >= 200 
-              ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) // A+
+            comment = this.score >= 180 // A+
+              ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) 
               : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
           }
-          if (broke) comment = 'ENLIGHTENED, YOU ARE';
         } else {
-          if (this.score >= 75) {
+          if (this.score >= 70) {
             rank = 'B';
             comment = randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
-          } else if (this.score >= 50) {
+          } else if (this.score >= 30) {
             rank = 'C';
             comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
           }
           if (sharpshooter) comment = randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE']);
-          if (broke) comment = 'I HOPE YOU LIKE RAMEN';
+          if (broke) comment = randomChoice(['WAS THAT ON PURPOSE?', 'USE PAPER NEXT TIME', 'I HOPE YOU LIKE RAMEN']);
         }
         this.gameOverText = [
           'GAME OVER',
