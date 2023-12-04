@@ -49,10 +49,27 @@ tracePoints = (points, enclose=true) => { // points is an array of Vector2 (see 
   ctx.closePath();
 }
 
-displayText = (text, x, y) => {
+displayText = (text, x, y, color=LINE_COLOR) => {
   ctx.font = FONT_SIZE+'px Mono';
-  ctx.fillStyle = LINE_COLOR;
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
+}
+
+displayTextBox = (textLines, x, y) => {
+  lineLengths = textLines.map((text) => text.length);
+  let xscale = Math.max(...lineLengths) * FONT_SIZE / 3.1;
+  let xLeft = x - xscale;
+  let xRight = x + xscale;
+  let yscale = textLines.length * FONT_SIZE / 1.4;
+  let yTop = y - yscale;
+  let yBottom = y + yscale;
+  box = [new Vector2(xLeft, yTop), new Vector2(xRight, yTop), new Vector2(xRight, yBottom), new Vector2(xLeft, yBottom)];
+  ctx.fillStyle = '#000';
+  ctx.fillRect(xLeft, yTop, xscale * 2, yscale * 2);
+  tracePoints(box);
+  for (let i = 0; i < textLines.length; i++) {
+    displayText(textLines[i], xLeft+PADDING, yTop+(FONT_SIZE+PADDING)*(i+1));
+  }
 }
 
 randomChoice = (choices) => { // https://stackoverflow.com/q/9071573/3178898
@@ -81,7 +98,7 @@ class Vector2 { // I know libraries for this exist but sometimes you want a scoo
   copy = () => { return new Vector2(this.x, this.y) } // TIL JS is sometimes pass by reference
 }
 
-class GameObject {
+class GameObject {PADDING
   constructor(game, loc=null, vel=null, radius=1) {
     this.game = game;
     this.loc = loc ? loc.copy() : new Vector2();
@@ -89,8 +106,8 @@ class GameObject {
     this.objId = this.game.register(this);
     this.radius = radius;
   }
-  inBounds = () => { return -this.radius < this.loc.x && this.loc.x < canvas.width+this.radius 
-                        && -this.radius < this.loc.y && this.loc.y < canvas.height+this.radius }
+  inBounds = () => { return -this.radius <= this.loc.x && this.loc.x <= canvas.width+this.radius 
+                        && -this.radius <= this.loc.y && this.loc.y <= canvas.height+this.radius }
   _onDestroy = () => {} // virtual
   destroy = () => { this._onDestroy(); this.game.deregister(this.objId); }
   update = () => {} // virtual
@@ -100,9 +117,11 @@ class GameObject {
 class Projectile extends GameObject {
   constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V)) }
   update = () => {
-    if (this.inBounds() && !this.game.checkAsteroidCollision(this)) {
+    let hit = this.game.checkAsteroidCollision(this);
+    if (!hit && this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime);
     } else {
+      if (hit) this.game.money++;
       this.destroy();
     }
   }
@@ -121,7 +140,7 @@ class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement
-    this.neutral = MOBILE ? new Vector2(0, 15) : null; // default neutral tilt is (0, 15) since first update can come in as (0, 0)
+    this.neutral = MOBILE ? new Vector2(0, 22) : null; // default neutral tilt is (0, 22) since first update can come in as (0, 0)
     this.registerInputs();
   }
   // generally, each event sets an update flag, then the response is handled during update()
@@ -216,6 +235,7 @@ class Asteroid extends GameObject {
     this.radius = ROCK_R;
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
   }
+  _onDestroy = () => { if (!this.game.gameOver) this.game.score++ }
   update = () => {
     if (this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime); // scaled negative to move inward on spawn
@@ -241,8 +261,9 @@ class BigAsteroid extends Asteroid {
     this.radius *= 2;
   }
   _onDestroy = () => {
-    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / 6); // splits into 2 asteroids before destroying itself
-    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / 6); // asteroids have same angle +/- 60 degrees
+    if (!this.game.gameOver) this.game.score += 3;
+    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / randomChoice([4, 5, 6])); // splits into 2 asteroids before destroying itself
+    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / randomChoice([4, 5, 6])); // asteroids have same angle +/- 45-60 degrees
   }
 }
 
@@ -278,7 +299,7 @@ class Game {
   _handleKeyInput = (event) => {
     if (!this.gameOver && event.key === 'Escape'){
        this._handlePause();
-    } else if (this.gameOver && event.key === 'Enter') {
+    } else if (this.gameOver && event.key === 'Escape') {
       this.newGame();    
     }
   }
@@ -288,7 +309,15 @@ class Game {
       cancelAnimationFrame(this.frameReq);
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
-      displayText(DEBUG ? DEBUG_ID : 'GAME PAUSED', this.player.loc.x, this.player.loc.y);
+      // displayText('YOU ARE HERE', this.player.loc.x, this.player.loc.y);
+      let pauseText = [
+        'YOU ARE HERE',
+        (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
+        MOBILE ? 'UNPAUSE TO CALIBRATE' : 'SPACE TO MOVE',
+        (MOBILE ? 'DOUBLE TAP' : 'ESC') + ' TO UNPAUSE',
+        randomChoice(['GOOD LUCK', 'GODSPEED', 'LOCK IN', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'SINCERELY,'])
+      ]
+      displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
       if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume
@@ -296,6 +325,9 @@ class Game {
       this.spawnAsteroid(0);
       this.frameReq = requestAnimationFrame(this.run);
     }
+  }
+  openMenu = () => {
+
   }
   register = (gameObj) => {
     this.gameObjects.set(++this.nextObjectId, gameObj);
@@ -310,7 +342,9 @@ class Game {
     this.paused = false;
     this.pauseTime = null;
     this.gameOver = false;
+    this.gameOverText = null;
     this.score = 0;
+    this.money = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
@@ -344,7 +378,6 @@ class Game {
       let gameObj = this.gameObjects.get(k);
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius) {
         gameObj.destroy();
-        this.score++;
         return true;
       }
     }
@@ -355,8 +388,42 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    displayText(DEBUG ? 'DEBUG' : this.score, PADDING, PADDING + FONT_SIZE);
-    if (this.gameOver) displayText('GAME OVER', this.player.loc.x, this.player.loc.y);
+    displayText(' '+this.score, PADDING, PADDING + FONT_SIZE);
+    displayText('$'+this.money, PADDING, 2 * (PADDING + FONT_SIZE), '#0F0');
+    if (this.gameOver){
+      if (!this.gameOverText) {
+        let rank = 'D';
+        let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'TRY HARDER']);
+        let sharpshooter = (this.money >= this.score * 0.7);
+        if (sharpshooter) comment = randomChoice(["NICE SHOOTIN' TEX", 'ZONED IN']);
+        if (this.score >= 100) {
+          if (sharpshooter) {
+            rank = 'S';
+            comment = randomChoice(['MISSION COMPLETE', 'SHOW OFF', 'INHUMAN', 'SEEK HELP']);
+          }
+          else {
+            rank = 'A';
+            comment = randomChoice(['TOP NOTCH', 'RESPECTABLE', 'GOOD JOB', 'TARTARE']);
+          }
+        } else if (this.score >= 50) {
+          rank = 'B';
+          comment = randomChoice(['SOLID', 'PRETTY GOOD', 'SKILLED', 'WELL DONE']);
+        } else if (this.score >= 25) {
+          rank = 'C';
+          comment = randomChoice(['NOT BAD', 'HEATING UP', 'DECENT', 'MEDIUM WELL']);
+        }
+        if (this.money === 0) comment = randomChoice(['ENLIGHTENED, YOU ARE', 'I HOPE YOU LIKE RAMEN', comment]);
+        this.gameOverText = [
+          'GAME OVER',
+          'SCORE: '+this.score,
+          'MONEY: '+this.money,
+          'RANK : '+rank,
+          comment,
+          (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
+        ]
+      }
+      displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
+    }
     if (DEBUG && this.player.neutral) {
       displayText('x:'+this.player.neutral.x, PADDING, canvas.height-FONT_SIZE*2);
       displayText('y:'+this.player.neutral.y, PADDING, PADDING + canvas.height-FONT_SIZE);
