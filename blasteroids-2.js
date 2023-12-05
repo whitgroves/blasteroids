@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false;
-const BUILD = '2023.12.4.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const BUILD = '2023.12.5.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -209,7 +209,7 @@ class Player extends GameObject {
   }
   _onDeviceOrientation = (event) => {
     this.tilt = new Vector2(event.gamma, event.beta);
-    if (!this.neutral) this.neutral = this.tilt.copy(); // remember starting position if one isn't set
+    if (!this.neutral) this.neutral = this.tilt.copy(); // remember neutral position if one isn't set
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -242,8 +242,7 @@ class Player extends GameObject {
       this.game.shots++;
     }
     // apply velocity    
-    if (MOBILE && this._isTilted()) {
-      // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+    if (MOBILE && this._isTilted()) { // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
       this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
     } 
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
@@ -355,7 +354,7 @@ class Game {
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume
+      if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume TODO make this a button instead
       this.lastTick += (Date.now() - this.pauseTime);
       this.spawnAsteroid();
       this.frameReq = requestAnimationFrame(this.run);
@@ -421,10 +420,9 @@ class Game {
   createGameOverText = () => {
     let rank = 'D';
     let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
-    if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'PEACE IS ALWAYS AN OPTION', comment]);
-    // if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
+    if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL', comment]);
     let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
-    if (this.score >= 120) {
+    if (this.score >= 150) {
       let pacifist = (this.hits === 0 && this.shots === 0);
       if (sharpshooter || pacifist || this.score >= 300) {
         rank = 'S';
@@ -432,7 +430,7 @@ class Game {
       }
       else {
         rank = 'A';
-        comment = this.score >= 180 // A+
+        comment = this.score >= 200 // A+
           ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) 
           : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
       }
