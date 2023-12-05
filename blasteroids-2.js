@@ -126,7 +126,10 @@ class Projectile extends GameObject {
     if (!hit && this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime);
     } else {
-      if (hit) this.game.money++;
+      if (hit) {
+        this.game.money++;
+        this.game.hits++;
+      }
       this.destroy();
     }
   }
@@ -208,6 +211,7 @@ class Player extends GameObject {
     if (this.firing) {
       new Projectile(this.game, this.loc, this.theta-T_OFFSET);
       this.firing = false;
+      this.game.shots++;
     }
     // apply velocity    
     if (MOBILE && this._isTilted()) {
@@ -218,8 +222,7 @@ class Player extends GameObject {
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
-    // collision check
-    if (this.game.checkAsteroidCollision(this)) this.destroy();
+    this.game.checkAsteroidCollision(this); // collision check
   }
   render = () => {
     var points = [];
@@ -266,7 +269,7 @@ class BigAsteroid extends Asteroid {
     this.radius *= 2;
   }
   _onDestroy = () => {
-    if (!this.game.gameOver) this.game.score += 3;
+    if (!this.game.gameOver) this.game.score++
     new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / randomChoice([4, 5, 6])); // splits into 2 asteroids before destroying itself
     new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / randomChoice([4, 5, 6])); // asteroids have same angle +/- 45-60 degrees
   }
@@ -349,6 +352,8 @@ class Game {
     this.gameOverText = null;
     this.score = 0;
     this.money = 0;
+    this.shots = 0;
+    this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
@@ -381,7 +386,9 @@ class Game {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius) {
+        collisionObj.destroy();
         gameObj.destroy();
+        // if (!this.gameOver) this.score++;
         return true;
       }
     }
@@ -398,12 +405,14 @@ class Game {
       if (!this.gameOverText) {
         let rank = 'D';
         let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
-        let sharpshooter = (this.score >= 25 && this.money >= this.score * 0.6); // TODO: update how this is measured
-        let broke = (this.money === 0);
+        if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'PEACE IS ALWAYS AN OPTION', comment]);
+        if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
+        let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
         if (this.score >= 120) {
-          if (sharpshooter || this.broke || this.score >= 300) {
+          let pacifist = (this.hits === 0 && this.shots === 0);
+          if (sharpshooter || pacifist) {
             rank = 'S';
-            comment = broke ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
+            comment = pacifist ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
           }
           else {
             rank = 'A';
@@ -412,15 +421,15 @@ class Game {
               : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
           }
         } else {
-          if (this.score >= 70) {
+          if (sharpshooter || this.score >= 70) {
             rank = 'B';
-            comment = randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
+            comment = sharpshooter 
+              ? randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE'])
+              : randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
           } else if (this.score >= 30) {
             rank = 'C';
             comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
           }
-          if (sharpshooter) comment = randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE']);
-          if (broke) comment = randomChoice(['WAS THAT ON PURPOSE?', 'USE PAPER NEXT TIME', 'I HOPE YOU LIKE RAMEN']);
         }
         this.gameOverText = [
           'GAME OVER',
