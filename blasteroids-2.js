@@ -1,13 +1,13 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
-const DEBUG = false; // the one and only
-const DEBUG_ID = 'TBD'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const DEBUG = false;
+const BUILD = '2023.12.4.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
-const DTAP_TIMEOUT = 250; // timeout for double-tap
-const TILT_THRESH = 0.45; // minimum tilt to move the player
+const DTAP_TIMEOUT = 250;
+const TILT_THRESH = 0.5;
 
 // game settings
 const FPS = 60
@@ -22,18 +22,20 @@ const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
 
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
-const PLAYER_R = MOBILE ? 20 : 16; // player radius (reminder: this is only HALF the player size)
-const PLAYER_V = 12; // player max vel
-const PLAYER_A = MOBILE ? 0.05 : 0.02; // default player acceleration
-const PLAYER_F = 0.02; // player friction
-const T_OFFSET = Math.PI / 2; // theta offset for player rotations; consequence of triangle pointing along y-axis
-const PROJ_V = 1; // projectile speed
-const PROJ_L = 10; // projectile length
+const PLAYER_R = MOBILE ? 20 : 16;     // radius
+const PLAYER_V = 12;                   // max vel
+const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
+const PLAYER_F = 0.02;                 // friction
+const T_OFFSET = Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
+
+// projectile config
+const PROJ_V = 1;  // velocity is constant
+const PROJ_L = 10; // length
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
-const ROCK_R = PLAYER_R * 2; // asteroid radius is always 2x the player
-const ROCK_V = 0.3; // asteroid speed
+const ROCK_R = PLAYER_R * 2; // radius
+const ROCK_V = 0.3;          // velocity is constant
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 
@@ -42,9 +44,9 @@ resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canva
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
 
-tracePoints = (points, enclose=true) => { // points is an array of Vector2 (see below)
+tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
-  ctx.strokeStyle = LINE_COLOR;
+  ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
   points.forEach(point => { ctx.lineTo(point.x, point.y) });
@@ -136,6 +138,30 @@ class Projectile extends GameObject {
   render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false) }
 }
 
+// TODO: Weapon superclass
+
+class ProjectileWeapon {
+  constructor(count=1) { this.count = count }
+  fire(game, loc, theta) {
+    switch (this.count) {
+      case 3:
+        let coneRatio = 0.0625; // 1/16
+        new Projectile(game, loc, theta);
+        new Projectile(game, loc, theta+(Math.PI*coneRatio));
+        new Projectile(game, loc, theta-(Math.PI*coneRatio));
+        break;
+      case 2:
+        let x_off = Math.sin(theta) * PLAYER_R * 0.35;
+        let y_off = Math.cos(theta) * PLAYER_R * 0.35;
+        new Projectile(game, new Vector2(loc.x-x_off, loc.y+y_off), theta);
+        new Projectile(game, new Vector2(loc.x+x_off, loc.y-y_off), theta);
+        break;
+      default:
+        new Projectile(game, loc, theta);
+    }
+   }
+}
+
 class Player extends GameObject {
   constructor(game) {
     resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
@@ -147,9 +173,10 @@ class Player extends GameObject {
     this.target = null;
     this.firing = false;
     this.boosting = false;
-    this.tilt = new Vector2(); // track device tilt on mobile to trigger movement
-    this.neutral = MOBILE ? new Vector2(0, 22) : null; // default neutral tilt is (0, 22) since first update can come in as (0, 0)
-    this.registerInputs();
+    this.tilt = new Vector2(); // track device tilt on mobile to trigger movement 
+    this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement 
+    this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
+    this.weapon = new ProjectileWeapon();
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -209,14 +236,14 @@ class Player extends GameObject {
     this.theta %= 2 * Math.PI; // radians
     // fire projectile
     if (this.firing) {
-      new Projectile(this.game, this.loc, this.theta-T_OFFSET);
+      this.weapon.fire(this.game, this.loc.copy(), this.theta-T_OFFSET);
       this.firing = false;
       this.game.shots++;
     }
     // apply velocity    
     if (MOBILE && this._isTilted()) {
-      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
       // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
+      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
     } 
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
@@ -268,7 +295,7 @@ class BigAsteroid extends Asteroid {
     super(game, loc, theta);
     this.radius *= 2;
   }
-  _onDestroy = () => {
+  _onDestroy = () => { // BUG: getting hit with multiple projectiles on the same frame triggers this twice
     if (!this.game.gameOver) this.game.score++
     new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / randomChoice([4, 5, 6])); // splits into 2 asteroids before destroying itself
     new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / randomChoice([4, 5, 6])); // asteroids have same angle +/- 45-60 degrees
@@ -329,12 +356,9 @@ class Game {
     else {
       if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume
       this.lastTick += (Date.now() - this.pauseTime);
-      this.spawnAsteroid(0);
+      this.spawnAsteroid();
       this.frameReq = requestAnimationFrame(this.run);
     }
-  }
-  openMenu = () => {
-
   }
   register = (gameObj) => {
     this.gameObjects.set(++this.nextObjectId, gameObj);
@@ -388,11 +412,48 @@ class Game {
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius) {
         collisionObj.destroy();
         gameObj.destroy();
-        // if (!this.gameOver) this.score++;
         return true;
       }
     }
     return false;
+  }
+  createGameOverText = () => {
+    let rank = 'D';
+    let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
+    if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'PEACE IS ALWAYS AN OPTION', comment]);
+    if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
+    let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
+    if (this.score >= 120) {
+      let pacifist = (this.hits === 0 && this.shots === 0);
+      if (sharpshooter || pacifist) {
+        rank = 'S';
+        comment = pacifist ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
+      }
+      else {
+        rank = 'A';
+        comment = this.score >= 180 // A+
+          ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) 
+          : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
+      }
+    } else {
+      if (sharpshooter || this.score >= 70) {
+        rank = 'B';
+        comment = sharpshooter 
+          ? randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE'])
+          : randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
+      } else if (this.score >= 30) {
+        rank = 'C';
+        comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
+      }
+    }
+    this.gameOverText = [
+      'GAME OVER',
+      'SCORE: '+this.score,
+      'MONEY: '+this.money,
+      'RANK : '+rank,
+      comment,
+      (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
+    ]
   }
   update = () => { this.gameObjects.forEach((gameObj) => { gameObj.update() }) }
   render = () => {
@@ -402,44 +463,7 @@ class Game {
     displayText(' '+this.score, PADDING, PADDING + FONT_SIZE);
     displayText('$'+this.money, PADDING, 2 * (PADDING + FONT_SIZE), '#0F0');
     if (this.gameOver){
-      if (!this.gameOverText) {
-        let rank = 'D';
-        let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
-        if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'PEACE IS ALWAYS AN OPTION', comment]);
-        if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
-        let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
-        if (this.score >= 120) {
-          let pacifist = (this.hits === 0 && this.shots === 0);
-          if (sharpshooter || pacifist) {
-            rank = 'S';
-            comment = pacifist ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
-          }
-          else {
-            rank = 'A';
-            comment = this.score >= 180 // A+
-              ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) 
-              : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
-          }
-        } else {
-          if (sharpshooter || this.score >= 70) {
-            rank = 'B';
-            comment = sharpshooter 
-              ? randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE'])
-              : randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
-          } else if (this.score >= 30) {
-            rank = 'C';
-            comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
-          }
-        }
-        this.gameOverText = [
-          'GAME OVER',
-          'SCORE: '+this.score,
-          'MONEY: '+this.money,
-          'RANK : '+rank,
-          comment,
-          (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
-        ]
-      }
+      if (!this.gameOverText) this.createGameOverText();
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
     if (DEBUG && this.player.neutral) {
