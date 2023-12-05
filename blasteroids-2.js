@@ -23,7 +23,7 @@ const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
 // player config
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
 const PLAYER_R = MOBILE ? 20 : 16;     // radius
-const PLAYER_V = 12;                   // max vel
+const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 const PLAYER_F = 0.02;                 // friction
 const T_OFFSET = Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
@@ -151,8 +151,9 @@ class ProjectileWeapon {
         new Projectile(game, loc, theta-(Math.PI*coneRatio));
         break;
       case 2:
-        let x_off = Math.sin(theta) * PLAYER_R * 0.35;
-        let y_off = Math.cos(theta) * PLAYER_R * 0.35;
+        let offsetRatio = PLAYER_R * 0.35;
+        let x_off = Math.sin(theta) * offsetRatio;
+        let y_off = Math.cos(theta) * offsetRatio;
         new Projectile(game, new Vector2(loc.x-x_off, loc.y+y_off), theta);
         new Projectile(game, new Vector2(loc.x+x_off, loc.y-y_off), theta);
         break;
@@ -296,7 +297,7 @@ class BigAsteroid extends Asteroid {
     this.radius *= 2;
   }
   _onDestroy = () => { // BUG: getting hit with multiple projectiles on the same frame triggers this twice
-    if (!this.game.gameOver) this.game.score++
+    if (!this.game.gameOver) this.game.score+=3
     new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / randomChoice([4, 5, 6])); // splits into 2 asteroids before destroying itself
     new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / randomChoice([4, 5, 6])); // asteroids have same angle +/- 45-60 degrees
   }
@@ -421,11 +422,11 @@ class Game {
     let rank = 'D';
     let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
     if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'PEACE IS ALWAYS AN OPTION', comment]);
-    if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
+    // if (this.money === 0) comment = randomChoice(['I HOPE YOU LIKE RAMEN', 'TRY PAPER NEXT TIME', comment]);
     let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
     if (this.score >= 120) {
       let pacifist = (this.hits === 0 && this.shots === 0);
-      if (sharpshooter || pacifist) {
+      if (sharpshooter || pacifist || this.score >= 300) {
         rank = 'S';
         comment = pacifist ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
       }
@@ -449,13 +450,17 @@ class Game {
     this.gameOverText = [
       'GAME OVER',
       'SCORE: '+this.score,
-      'MONEY: '+this.money,
+      // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
+      // 'MONEY: '+this.money,
       'RANK : '+rank,
       comment,
       (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
     ]
   }
-  update = () => { this.gameObjects.forEach((gameObj) => { gameObj.update() }) }
+  update = () => { 
+    this.gameObjects.forEach((gameObj) => { gameObj.update() });
+    if (this.gameOver) clearTimeout(this.asteroidTimer);
+  }
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
