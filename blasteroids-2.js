@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false;
-const BUILD = '2023.12.5.1'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const BUILD = '2023.12.6.2'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -84,7 +84,7 @@ randomChoice = (choices) => { // https://stackoverflow.com/q/9071573/3178898
   return choices[i];
 }
 
-randomVal = (max, min) => { return Math.random() * (max - min) + min }
+randomVal = (min, max) => { return Math.random() * (max - min) + min }
 
 class Vector2 { // I know libraries for this exist but sometimes you want a scoop of vanilla
   constructor(x=0, y=0, scale=1) {
@@ -151,7 +151,7 @@ class ProjectileWeapon {
         new Projectile(game, loc, theta-(Math.PI*coneRatio));
         break;
       case 2:
-        let offsetRatio = PLAYER_R * 0.35;
+        let offsetRatio = PLAYER_R * 0.35; // it just works
         let x_off = Math.sin(theta) * offsetRatio;
         let y_off = Math.cos(theta) * offsetRatio;
         new Projectile(game, new Vector2(loc.x-x_off, loc.y+y_off), theta);
@@ -230,7 +230,7 @@ class Player extends GameObject {
     // rotate towards target
     if (this.target) { 
       this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x) + T_OFFSET;
-      setTimeout(() => this.target = null, TIME_STEP * 30); // stay on target for the next 30 frames so shots land
+      setTimeout(() => this.target = null, TIME_STEP * 30); // stay on target for the next 30 frames so shots land on mobile
     } else if (this._isTilted()) {
       this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) + T_OFFSET;
     }
@@ -297,8 +297,8 @@ class BigAsteroid extends Asteroid {
   }
   _onDestroy = () => { // BUG: getting hit with multiple projectiles on the same frame triggers this twice
     if (!this.game.gameOver) this.game.score+=3
-    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI / randomChoice([4, 5, 6])); // splits into 2 asteroids before destroying itself
-    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI / randomChoice([4, 5, 6])); // asteroids have same angle +/- 45-60 degrees
+    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25)); // splits into 2 asteroids before destroying itself
+    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); // asteroids have same angle +/- 45-60 degrees (pi/6-pi/4 radians)
   }
 }
 
@@ -418,7 +418,7 @@ class Game {
     return false;
   }
   createGameOverText = () => {
-    let sharpshooter = (this.hits >= this.shots * 0.8);
+    let sharpshooter = (this.hits >= this.shots * 0.85);
     let pacifist = (this.shots === 0);
     // D rank
     let rank = 'D';
@@ -427,20 +427,20 @@ class Game {
     // C rank
     if (sharpshooter && this.score >= 25) {
       rank = 'C';
-      commentPool = ['HEATING UP'];
+      commentPool = ['HEATING UP', "LET 'EM COOK"];
     }
-    if (this.score >= 50) {
+    if (this.score >= 45) {
       rank = 'C';
       commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 65) {
       rank = 'B';
-      commentPool = ["NICE SHOOTIN' TEX"];
+      commentPool = ["NICE SHOOTIN' TEX", 'LOCKED IN'];
     }
-    if (this.score >= 100) {
+    if (this.score >= 90) {
       rank = 'B';
-      commentPool = ['GOOD JOB', 'RESPECTABLE', 'SOLID', 'WELL DONE'];
+      commentPool = ['GOOD HUSTLE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A rank
     if (pacifist && this.score >= 108) {
@@ -449,13 +449,14 @@ class Game {
     }
     if (sharpshooter && this.score >= 120) {
       rank = 'A'; 
-      commentPool = ['LOCKED IN', 'EAGLE EYE'];
+      commentPool = ['HOT SHOT', 'EAGLE EYE'];
     }
-    if (this.score >= 200) {
+    if (this.score >= 180) {
       rank = 'A';
-      commentPool = ['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE'];
-      if (sharpshooter || pacifist || this.score >= 300) { // S rank
-        commentPool = sharpshooter ? ['INHUMAN', 'SEEK HELP', 'TARTARE'] : pacifist ? ['ENLIGHTENED, YOU ARE'] : ['UNBELIEVABLE', 'CHILL OUT', 'MISSION ACCOMPLISHED', 'RAW'];
+      commentPool = ['TOP NOTCH', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
+      if (sharpshooter || pacifist || this.score >= 300) {
+        rank = 'S';
+        commentPool = pacifist ? ['ENLIGHTENED, YOU ARE'] : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'RAW'];
       }
     }
     this.gameOverText = [
