@@ -2,11 +2,12 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false;
-const BUILD = '2023.12.6.2'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const BUILD = '2023.12.6.3'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 const DTAP_TIMEOUT = 250;
+const LTAP_TIMEOUT = 500; // how long to wait for a long press
 const TILT_THRESH = 0.5;
 
 // game settings
@@ -313,7 +314,10 @@ class Game {
     // inputs
     if (MOBILE) {
       this.waitingForDoubleTap = false;
-      window.addEventListener('touchstart', this._handleTouchInput);
+      // this.tapStart = null;
+      this.longPress = null;
+      window.addEventListener('touchstart', this._handleTouchStart);
+      window.addEventListener('touchend', this._handleTouchEnd);
     } else {
       window.addEventListener('keydown', this._handleKeyInput);
     }
@@ -321,15 +325,21 @@ class Game {
     this.newGame();
     this.frameReq = requestAnimationFrame(this.run);
   }
-  _handleTouchInput = (event) => {
+  _handleTouchStart = (event) => {
     event.preventDefault(); // block resize on double-tap
+    // if (!this.tapStart) this.tapStart = Date.now(); // long press
+    if (!this.longPress) this.longPress = setTimeout((this.gameOver ? this.newGame : this._handlePause), LTAP_TIMEOUT);
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
     } else {
+      if (this.paused) this._handlePause(recalibrate=true); // double-tap to recalibrate on resume
       if (this.gameOver) this.newGame(); // double-tap to restart
-      else this._handlePause(); // un/pause on double-tap
     }
+  }
+  _handleTouchEnd = (event) => { // long press
+    clearTimeout(this.longPress);
+    this.longPress = null;
   }
   _handleKeyInput = (event) => {
     if (!this.gameOver && event.key === 'Escape'){
@@ -338,7 +348,7 @@ class Game {
       this.newGame();
     }
   }
-  _handlePause = () => {
+  _handlePause = (recalibrate=false) => {
     this.paused = !this.paused;
     if (this.paused) {
       cancelAnimationFrame(this.frameReq);
@@ -348,13 +358,13 @@ class Game {
         'YOU ARE HERE',
         (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-        (MOBILE ? 'DOUBLE TAP' : 'ESC') + ' TO RESUME',
+        (MOBILE ? 'HOLD' : 'ESC') + ' TO RESUME',
         DEBUG ? DEBUG_ID : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,'])
       ]
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      if (MOBILE) this.player.neutral = null; // player will auto-update the neutral position on resume TODO make this a button instead
+      if (MOBILE && recalibrate) this.player.neutral = null;
       this.lastTick += (Date.now() - this.pauseTime);
       this.spawnAsteroid();
       this.frameReq = requestAnimationFrame(this.run);
@@ -466,7 +476,7 @@ class Game {
       // 'MONEY: '+this.money,
       'RANK : '+rank,
       randomChoice(commentPool), //comment,
-      (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
+      (MOBILE ? 'HOLD' : 'ESC') + ' FOR NEW GAME'
     ]
   }
   update = () => { 
@@ -509,4 +519,4 @@ class Game {
   }
 }
 
-var game = new Game();
+ var game = new Game();
