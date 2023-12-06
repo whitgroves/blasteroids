@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = false;
-const BUILD = '2023.12.5.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const BUILD = '2023.12.5.1'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
  
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -29,13 +29,13 @@ const PLAYER_F = 0.02;                 // friction
 const T_OFFSET = Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
 
 // projectile config
-const PROJ_V = 1;  // velocity is constant
+const PROJ_V = 1;  // velocity
 const PROJ_L = 10; // length
 
 // asteroid config
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 const ROCK_R = PLAYER_R * 2; // radius
-const ROCK_V = 0.3;          // velocity is constant
+const ROCK_V = 0.3;          // velocity
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 
@@ -418,31 +418,44 @@ class Game {
     return false;
   }
   createGameOverText = () => {
+    let sharpshooter = (this.hits >= this.shots * 0.8);
+    let pacifist = (this.shots === 0);
+    // D rank
     let rank = 'D';
-    let comment = randomChoice(["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER']);
-    if (this.hits === 0) comment = randomChoice([(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL', comment]);
-    let sharpshooter = (this.shots >= 50 && this.hits >= this.shots * 0.7);
-    if (this.score >= 150) {
-      let pacifist = (this.hits === 0 && this.shots === 0);
-      if (sharpshooter || pacifist || this.score >= 300) {
-        rank = 'S';
-        comment = pacifist ? 'ENLIGHTENED, YOU ARE' : randomChoice(['UNBELIEVABLE', 'INHUMAN', 'SEEK HELP', 'RAW']);
-      }
-      else {
-        rank = 'A';
-        comment = this.score >= 200 // A+
-          ? randomChoice(['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE']) 
-          : randomChoice(['GOOD JOB', 'MISSION ACCOMPLISHED', 'WELL DONE']);
-      }
-    } else {
-      if (sharpshooter || this.score >= 70) {
-        rank = 'B';
-        comment = sharpshooter 
-          ? randomChoice(["NICE SHOOTIN' TEX", 'LOCKED IN', 'EAGLE EYE'])
-          : randomChoice(['PRETTY GOOD', 'RESPECTABLE', 'SOLID', 'MEDIUM WELL']);
-      } else if (this.score >= 30) {
-        rank = 'C';
-        comment = randomChoice(['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'HEATING UP']);
+    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER'];
+    if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
+    // C rank
+    if (sharpshooter && this.score >= 25) {
+      rank = 'C';
+      commentPool = ['HEATING UP'];
+    }
+    if (this.score >= 50) {
+      rank = 'C';
+      commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
+    }
+    // B rank
+    if (sharpshooter && this.score >= 65) {
+      rank = 'B';
+      commentPool = ["NICE SHOOTIN' TEX"];
+    }
+    if (this.score >= 100) {
+      rank = 'B';
+      commentPool = ['GOOD JOB', 'RESPECTABLE', 'SOLID', 'WELL DONE'];
+    }
+    // A rank
+    if (pacifist && this.score >= 108) {
+      rank = 'A';
+      commentPool = ['WALK THE PATH', 'EMPTY MIND'];
+    }
+    if (sharpshooter && this.score >= 120) {
+      rank = 'A'; 
+      commentPool = ['LOCKED IN', 'EAGLE EYE'];
+    }
+    if (this.score >= 200) {
+      rank = 'A';
+      commentPool = ['TOP NOTCH', 'EXCELLENT', 'SHOW OFF', 'RARE'];
+      if (sharpshooter || pacifist || this.score >= 300) { // S rank
+        commentPool = sharpshooter ? ['INHUMAN', 'SEEK HELP', 'TARTARE'] : pacifist ? ['ENLIGHTENED, YOU ARE'] : ['UNBELIEVABLE', 'CHILL OUT', 'MISSION ACCOMPLISHED', 'RAW'];
       }
     }
     this.gameOverText = [
@@ -451,7 +464,7 @@ class Game {
       // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
       // 'MONEY: '+this.money,
       'RANK : '+rank,
-      comment,
+      randomChoice(commentPool), //comment,
       (MOBILE ? 'DOUBLE TAP' : 'PRESS ESC') + ' FOR NEW GAME'
     ]
   }
