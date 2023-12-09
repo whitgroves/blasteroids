@@ -1,14 +1,23 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
-const DEBUG = false;
-const BUILD = '2023.12.6.3'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
- 
+const DEBUG = true;
+const BUILD = '2023.12.9.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
-const DTAP_TIMEOUT = 250;
+const DTAP_TIMEOUT = 300;
 const LTAP_TIMEOUT = 500; // how long to wait for a long press
 const TILT_THRESH = 0.5;
+
+// TODO: check if canvas.x is larger than canvas.y to determine landscape vs portrait on mobile -- both adjust the gyro and the game resolution
+// --and do this every frame!
+let lastOrientation = screen.orientation.type;
+if (MOBILE && DEBUG) alert(lastOrientation);
+// if (MOBILE) {
+//   let screenOrientation = window.screen.orientation;
+//   screenOrientation.lock('portrait');
+// }
 
 // game settings
 const FPS = 60
@@ -176,7 +185,7 @@ class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement 
-    this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement 
+    this.neutral = MOBILE && !DEBUG ? new Vector2(0, 22) : null; // neutral position for tilt movement
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
     this.weapon = new ProjectileWeapon();
   }
@@ -209,8 +218,31 @@ class Player extends GameObject {
     this.firing = true;
   }
   _onDeviceOrientation = (event) => {
-    this.tilt = new Vector2(event.gamma, event.beta);
+    let beta = Math.max(-90, Math.min(event.beta, 90)); // [-180, 180) -> clamp to [-90, 90)
+    let gamma = event.gamma; // [-90, 90)
+    let screenOrientation = screen.orientation.type;
+    let x = 0;
+    let y = 0;
+    switch (screenOrientation) {
+      case 'portrait-primary':
+        x = gamma;
+        y = beta;
+        break;
+      case 'landscape-primary':
+        x = beta;
+        y = -gamma;
+        break;
+      case 'landscape-secondary':
+        x = -beta;
+        y = gamma;
+        break;
+    }
+    this.tilt = new Vector2(x, y);
     if (!this.neutral) this.neutral = this.tilt.copy(); // remember neutral position if one isn't set
+    if (lastOrientation != screenOrientation) {
+      lastOrientation = screenOrientation;
+      if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
+    }
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
   _onMouseDown = (event) => { if (event.button === 0) this.firing = true }
@@ -244,7 +276,7 @@ class Player extends GameObject {
     }
     // apply velocity    
     if (MOBILE && this._isTilted()) { // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
-      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt data
+      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt input
     } 
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
@@ -314,7 +346,6 @@ class Game {
     // inputs
     if (MOBILE) {
       this.waitingForDoubleTap = false;
-      // this.tapStart = null;
       this.longPress = null;
       window.addEventListener('touchstart', this._handleTouchStart);
       window.addEventListener('touchend', this._handleTouchEnd);
@@ -327,44 +358,47 @@ class Game {
   }
   _handleTouchStart = (event) => {
     event.preventDefault(); // block resize on double-tap
-    // if (!this.tapStart) this.tapStart = Date.now(); // long press
-    if (!this.longPress) this.longPress = setTimeout((this.gameOver ? this.newGame : this._handlePause), LTAP_TIMEOUT);
+    if (!this.longPress) this.longPress = setTimeout((this.gameOver ? this.newGame : this.handlePause), LTAP_TIMEOUT);
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
     } else {
-      if (this.paused) this._handlePause(recalibrate=true); // double-tap to recalibrate on resume
-      if (this.gameOver) this.newGame(); // double-tap to restart
+      if (this.paused) { // recalibrate on resume
+        this.player.neutral = null;
+        this.handlePause();
+      } 
+      if (this.gameOver) this.newGame(); // restart
     }
   }
   _handleTouchEnd = (event) => { // long press
+    event.preventDefault();
     clearTimeout(this.longPress);
     this.longPress = null;
   }
   _handleKeyInput = (event) => {
     if (!this.gameOver && event.key === 'Escape'){
-       this._handlePause();
+       this.handlePause();
     } else if (this.gameOver && event.key === 'Escape') {
       this.newGame();
     }
   }
-  _handlePause = (recalibrate=false) => {
+  handlePause = () => {
     this.paused = !this.paused;
     if (this.paused) {
       cancelAnimationFrame(this.frameReq);
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
       let pauseText = [
-        'YOU ARE HERE',
+        'BLASTEROIDS',
         (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
         (MOBILE ? 'HOLD' : 'ESC') + ' TO RESUME',
-        DEBUG ? DEBUG_ID : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,'])
+        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,'])
       ]
+      if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO CALIBRATE');
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      if (MOBILE && recalibrate) this.player.neutral = null;
       this.lastTick += (Date.now() - this.pauseTime);
       this.spawnAsteroid();
       this.frameReq = requestAnimationFrame(this.run);
@@ -476,6 +510,7 @@ class Game {
       // 'MONEY: '+this.money,
       'RANK : '+rank,
       randomChoice(commentPool), //comment,
+      'THANKS FOR PLAYING',
       (MOBILE ? 'HOLD' : 'ESC') + ' FOR NEW GAME'
     ]
   }
@@ -493,9 +528,9 @@ class Game {
       if (!this.gameOverText) this.createGameOverText();
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
-    if (DEBUG && this.player.neutral) {
-      displayText('x:'+this.player.neutral.x, PADDING, canvas.height-FONT_SIZE*2);
-      displayText('y:'+this.player.neutral.y, PADDING, PADDING + canvas.height-FONT_SIZE);
+    if (DEBUG && this.player.tilt) {
+      displayText('x:'+this.player.tilt.x, PADDING, canvas.height-FONT_SIZE*2);
+      displayText('y:'+this.player.tilt.y, PADDING, PADDING + canvas.height-FONT_SIZE);
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
