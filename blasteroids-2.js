@@ -1,8 +1,8 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
-const DEBUG = true;
-const BUILD = '2023.12.9.0'; // changing this on each push makes it easier to tell if s3 is serving a cached version or not
+const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
+const BUILD = '2023.12.10.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -10,14 +10,8 @@ const DTAP_TIMEOUT = 300;
 const LTAP_TIMEOUT = 500; // how long to wait for a long press
 const TILT_THRESH = 0.5;
 
-// TODO: check if canvas.x is larger than canvas.y to determine landscape vs portrait on mobile -- both adjust the gyro and the game resolution
-// --and do this every frame!
 let lastOrientation = screen.orientation.type;
 if (MOBILE && DEBUG) alert(lastOrientation);
-// if (MOBILE) {
-//   let screenOrientation = window.screen.orientation;
-//   screenOrientation.lock('portrait');
-// }
 
 // game settings
 const FPS = 60
@@ -138,10 +132,7 @@ class Projectile extends GameObject {
     if (!hit && this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime);
     } else {
-      if (hit) {
-        this.game.money++;
-        this.game.hits++;
-      }
+      if (hit) this.game.hits++;
       this.destroy();
     }
   }
@@ -185,7 +176,7 @@ class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement 
-    this.neutral = MOBILE && !DEBUG ? new Vector2(0, 22) : null; // neutral position for tilt movement
+    this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
     this.weapon = new ProjectileWeapon();
   }
@@ -419,7 +410,6 @@ class Game {
     this.gameOver = false;
     this.gameOverText = null;
     this.score = 0;
-    this.money = 0;
     this.shots = 0;
     this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
@@ -507,10 +497,9 @@ class Game {
       'GAME OVER',
       'SCORE: '+this.score,
       // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
-      // 'MONEY: '+this.money,
       'RANK : '+rank,
       randomChoice(commentPool), //comment,
-      'THANKS FOR PLAYING',
+      // 'THANKS FOR PLAYING',
       (MOBILE ? 'HOLD' : 'ESC') + ' FOR NEW GAME'
     ]
   }
@@ -522,8 +511,9 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    displayText(' '+this.score, PADDING, PADDING + FONT_SIZE);
-    displayText('$'+this.money, PADDING, 2 * (PADDING + FONT_SIZE), '#0F0');
+    displayText(''+this.score, PADDING, PADDING + FONT_SIZE);
+    // displayText('SHOTS: '+this.shots, PADDING, 2 * (PADDING + FONT_SIZE), '#FF0');
+    // displayText('HITS : '+this.hits, PADDING, 3 * (PADDING + FONT_SIZE), '#F00');
     if (this.gameOver){
       if (!this.gameOverText) this.createGameOverText();
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
