@@ -24,7 +24,7 @@ const PADDING = 10;
 const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
 
-// player config
+// player
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
 const PLAYER_R = MOBILE ? 20 : 16;     // radius
 const PLAYER_V = MOBILE ? 15 : 12;     // max vel
@@ -32,11 +32,14 @@ const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 const PLAYER_F = 0.02;                 // friction
 const T_OFFSET = Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
 
-// projectile config
+// projectile
 const PROJ_V = 1;  // velocity
 const PROJ_L = 10; // length
 
-// asteroid config
+// upgrade
+const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI / 6), (3 * Math.PI / 2), (11 * Math.PI / 6)];
+
+// asteroid 
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 const ROCK_R = PLAYER_R * 2; // radius
 const ROCK_V = 0.3;          // velocity
@@ -135,7 +138,11 @@ class Projectile extends GameObject {
     if (!hit && this._inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
     } else {
-      if (hit) this.game.hits++;
+      if (hit) {
+        this.game.hits++;
+        if (this.game.player.weapon.count < 3 && Math.floor(this.game.score/50) === this.game.player.weapon.count)
+          this.game.spawnAsteroid(2, false); // upgrade every 50 pts
+      }
       this.destroy();
     }
   }
@@ -331,6 +338,26 @@ class BigAsteroid extends Asteroid {
   }
 }
 
+class Upgrade extends Asteroid {
+  _onDestroy = () => {
+    if (this._inBounds()) {
+      this.game.score += 5;
+      if (this.game.player.weapon.count < 3) this.game.player.weapon.count++;
+    }
+    this.game.upgradeInPlay = false;
+  }
+  render = () => {
+    var points = [];
+    HEXAGON.forEach(point => {
+      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
+      points.push(new Vector2(x, y));
+    });
+    if (DEBUG) points.push(this.loc.copy());
+    tracePoints(points, true, '#0F0');
+  }
+}
+
 class Game {
   constructor() {
     // timer
@@ -421,8 +448,9 @@ class Game {
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
     this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
+    this.upgradeInPlay = false;
   }
-  spawnAsteroid = (size=0) => { // spawns a new asteroid then queues the next one on a decreasing timer
+  spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing timer
     if (!this.gameOver) {
       let x = null;
       let y = null;
@@ -440,9 +468,17 @@ class Game {
         case 1:
           new BigAsteroid(this, new Vector2(x, y));
           break;
+        case 2:
+          if (!this.upgradeInPlay) {
+            new Upgrade(this, new Vector2(x, y));
+            this.upgradeInPlay = true;
+          } else {
+            new Asteroid(this, new Vector2(x, y));
+          }
+          break;
       }
       if (this.timeToImpact > (DEBUG ? 5000 : 1000)) this.timeToImpact -= 25;
-      this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
+      if (chain) this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
     }
   }
   checkAsteroidCollision = (collisionObj) => {
