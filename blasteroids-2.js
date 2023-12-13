@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.10.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.12.7'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -48,6 +48,8 @@ resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canva
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
 
+getScale = () => { return MOBILE && lastOrientation !== 'portrait-primary' ? 0.5 : 1 }
+
 tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = color;
@@ -59,15 +61,15 @@ tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an arra
 }
 
 displayText = (text, x, y, color=LINE_COLOR) => {
-  ctx.font = FONT_SIZE+'px '+FONT_FAM;
+  ctx.font = FONT_SIZE * getScale()+'px '+FONT_FAM;
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
 }
 
 displayTextBox = (textLines, x, y) => {
   lineLengths = textLines.map((text) => text.length);
-  let xscale = Math.max(...lineLengths) * FONT_SIZE * XSCALE_F;
-  let yscale = textLines.length * FONT_SIZE * YSXALE_F;
+  let xscale = Math.max(...lineLengths) * FONT_SIZE * XSCALE_F * getScale();
+  let yscale = textLines.length * FONT_SIZE * YSXALE_F * getScale();
   x = Math.max(xscale, Math.min(x, canvas.width-xscale-PADDING)); // keep box in-bounds
   y = Math.max(yscale, Math.min(y, canvas.height-yscale-PADDING));
   let xLeft = x - xscale;
@@ -79,7 +81,7 @@ displayTextBox = (textLines, x, y) => {
   ctx.fillRect(xLeft, yTop, xscale * 2, yscale * 2);
   tracePoints(box);
   for (let i = 0; i < textLines.length; i++) {
-    displayText(textLines[i], xLeft+PADDING, yTop+(FONT_SIZE+PADDING)*(i+1));
+    displayText(textLines[i], xLeft+PADDING * getScale(), yTop+(FONT_SIZE+PADDING)*(i+1) * getScale());
   }
 }
 
@@ -115,10 +117,11 @@ class GameObject {PADDING
     this.loc = loc ? loc.copy() : new Vector2();
     this.vel = vel ? vel.copy() : new Vector2();
     this.objId = this.game.register(this);
-    this.radius = radius;
+    this._radius = radius;
   }
-  inBounds = () => { return -this.radius <= this.loc.x && this.loc.x <= canvas.width+this.radius 
-                        && -this.radius <= this.loc.y && this.loc.y <= canvas.height+this.radius }
+  radius = () => { return getScale() * this._radius }
+  _inBounds = () => { return -this.radius() <= this.loc.x && this.loc.x <= canvas.width+this.radius() 
+                          && -this.radius() <= this.loc.y && this.loc.y <= canvas.height+this.radius() }
   _onDestroy = () => {} // virtual
   destroy = () => { this._onDestroy(); this.game.deregister(this.objId); }
   update = () => {} // virtual
@@ -129,8 +132,8 @@ class Projectile extends GameObject {
   constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V)) }
   update = () => {
     let hit = this.game.checkAsteroidCollision(this);
-    if (!hit && this.inBounds()) {
-      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime);
+    if (!hit && this._inBounds()) {
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
     } else {
       if (hit) this.game.hits++;
       this.destroy();
@@ -171,7 +174,7 @@ class Player extends GameObject {
     this.accel = PLAYER_A;
     this.frict = PLAYER_F;
     this.theta = 0;
-    this.radius = PLAYER_R;
+    this._radius = PLAYER_R;
     this.target = null;
     this.firing = false;
     this.boosting = false;
@@ -233,6 +236,8 @@ class Player extends GameObject {
     if (lastOrientation != screenOrientation) {
       lastOrientation = screenOrientation;
       if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
+      resizeCanvas();
+      if (DEBUG) alert('x:'+canvas.width+' y:'+canvas.height);
     }
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
@@ -245,7 +250,7 @@ class Player extends GameObject {
   }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH}
   _safeUpdateVelocity = (v) => {
-    v *= (1 - this.frict)
+    v *= (1 - this.frict);
     v = Math.max(-PLAYER_V, Math.min(v, PLAYER_V));            
     if (Math.abs(v) < 0.001) v = 0;
     return v;
@@ -267,7 +272,7 @@ class Player extends GameObject {
     }
     // apply velocity    
     if (MOBILE && this._isTilted()) { // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
-      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111); // scale by 1/90 to normalize raw tilt input
+      this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * getScale()); // scale by 1/90 to normalize raw tilt input
     } 
     if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
@@ -278,8 +283,8 @@ class Player extends GameObject {
   render = () => {
     var points = [];
     TRIANGLE.forEach(point => {
-      var x = this.loc.x + this.radius * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius * Math.sin(point + this.theta);
+      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
       points.push(new Vector2(x, y));
     });
     tracePoints(points);
@@ -291,13 +296,13 @@ class Asteroid extends GameObject {
     super(game, loc);
     this.theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x); // by default, head towards player
     this.vel.set(Math.cos(this.theta), Math.sin(this.theta), ROCK_V);
-    this.radius = ROCK_R;
+    this._radius = ROCK_R;
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
   }
   _onDestroy = () => { if (!this.game.gameOver) this.game.score++ }
   update = () => {
-    if (this.inBounds()) {
-      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime); // scaled negative to move inward on spawn
+    if (this._inBounds()) {
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
     } else {
       this.destroy();
     }
@@ -305,8 +310,8 @@ class Asteroid extends GameObject {
   render = () => {
     var points = [];
     OCTAGON.forEach(point => {
-      var x = this.loc.x + this.radius * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius * Math.sin(point + this.theta);
+      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
       points.push(new Vector2(x, y));
     });
     if (DEBUG) points.push(this.loc.copy());
@@ -317,7 +322,7 @@ class Asteroid extends GameObject {
 class BigAsteroid extends Asteroid {
   constructor(game, loc, theta=null) {
     super(game, loc, theta);
-    this.radius *= 2;
+    this._radius *= 2;
   }
   _onDestroy = () => { // BUG: getting hit with multiple projectiles on the same frame triggers this twice
     if (!this.game.gameOver) this.game.score+=3
@@ -384,7 +389,7 @@ class Game {
         (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
         (MOBILE ? 'HOLD' : 'ESC') + ' TO RESUME',
-        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,'])
+        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'RESPECTFULLY,'])
       ]
       if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO CALIBRATE');
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
@@ -443,7 +448,7 @@ class Game {
   checkAsteroidCollision = (collisionObj) => {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
-      if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius) {
+      if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius()) {
         collisionObj.destroy();
         gameObj.destroy();
         return true;
@@ -499,7 +504,7 @@ class Game {
       // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
       'RANK : '+rank,
       randomChoice(commentPool), //comment,
-      // 'THANKS FOR PLAYING',
+      'THANKS FOR PLAYING',
       (MOBILE ? 'HOLD' : 'ESC') + ' FOR NEW GAME'
     ]
   }
@@ -511,16 +516,16 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    displayText(''+this.score, PADDING, PADDING + FONT_SIZE);
-    // displayText('SHOTS: '+this.shots, PADDING, 2 * (PADDING + FONT_SIZE), '#FF0');
-    // displayText('HITS : '+this.hits, PADDING, 3 * (PADDING + FONT_SIZE), '#F00');
+    let padding = PADDING * getScale()
+    let fontSize = FONT_SIZE * getScale()
+    displayText(this.score, padding, padding + fontSize);
     if (this.gameOver){
       if (!this.gameOverText) this.createGameOverText();
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
     if (DEBUG && this.player.tilt) {
-      displayText('x:'+this.player.tilt.x, PADDING, canvas.height-FONT_SIZE*2);
-      displayText('y:'+this.player.tilt.y, PADDING, PADDING + canvas.height-FONT_SIZE);
+      displayText('x:'+this.player.tilt.x, padding, canvas.height-fontSize*2);
+      displayText('y:'+this.player.tilt.y, padding, padding + canvas.height-fontSize);
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
