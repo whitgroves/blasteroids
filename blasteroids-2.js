@@ -115,16 +115,26 @@ class Vector2 { // I know libraries for this exist but sometimes you want a scoo
 }
 
 class GameObject {PADDING
-  constructor(game, loc=null, vel=null, radius=1) {
+  constructor(game, loc=null, vel=null, radius=1, theta=0) {
     this.game = game;
     this.loc = loc ? loc.copy() : new Vector2();
     this.vel = vel ? vel.copy() : new Vector2();
     this.objId = this.game.register(this);
     this._radius = radius;
+    this.theta = theta;
   }
   radius = () => { return getScale() * this._radius }
   _inBounds = () => { return -this.radius() <= this.loc.x && this.loc.x <= canvas.width+this.radius() 
                           && -this.radius() <= this.loc.y && this.loc.y <= canvas.height+this.radius() }
+  _points = (shape) => { 
+    var points = [];
+    shape.forEach(point => {
+      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
+      points.push(new Vector2(x, y));
+    });
+    return points;
+  }
   _onDestroy = () => {} // virtual
   destroy = () => { this._onDestroy(); this.game.deregister(this.objId); }
   update = () => {} // virtual
@@ -132,29 +142,37 @@ class GameObject {PADDING
 }
 
 class Projectile extends GameObject {
-  constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V)) }
+  constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), theta) }
   update = () => {
     let hit = this.game.checkAsteroidCollision(this);
     if (!hit && this._inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
     } else {
-      if (hit) {
-        this.game.hits++;
-        if (this.game.player.weapon.count < 3 && Math.floor(this.game.score/50) === this.game.player.weapon.count)
-          this.game.spawnAsteroid(2, false); // upgrade every 50 pts
-      }
+      if (hit) this.game.hits++;
       this.destroy();
     }
   }
   render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false) }
 }
 
-// TODO: Weapon superclass
+class Bomb extends GameObject {
+  constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), theta) }
+  update = () => {
+    let hit = this.game.checkAsteroidCollision(this);
+    if (!hit && this._inBounds()) {
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
+    } else {
+      if (hit) this.game.hits++;
+      this.destroy();
+    }
+  }
+}
 
-class ProjectileWeapon {
-  constructor(count=1) { this.count = count }
+const MAX_WEAPON_LVL = 3;
+class PlayerWeapon {
+  constructor(level=1) { this.level = level }
   fire(game, loc, theta) {
-    switch (this.count) {
+    switch (this.level) {
       case 3:
         let coneRatio = 0.0625; // 1/16
         new Projectile(game, loc, theta);
@@ -188,7 +206,7 @@ class Player extends GameObject {
     this.tilt = new Vector2(); // track device tilt on mobile to trigger movement 
     this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
-    this.weapon = new ProjectileWeapon();
+    this.weapon = new PlayerWeapon();
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -288,25 +306,33 @@ class Player extends GameObject {
     this.game.checkAsteroidCollision(this); // collision check
   }
   render = () => {
-    var points = [];
-    TRIANGLE.forEach(point => {
-      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
-      points.push(new Vector2(x, y));
-    });
+    // var points = [];
+    // TRIANGLE.forEach(point => {
+    //   var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+    //   var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
+    //   points.push(new Vector2(x, y));
+    // });
+    var points = this._points(TRIANGLE);
     tracePoints(points);
   }
 }
 
 class Asteroid extends GameObject {
   constructor(game, loc, theta=null) {
-    super(game, loc);
-    this.theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x); // by default, head towards player
-    this.vel.set(Math.cos(this.theta), Math.sin(this.theta), ROCK_V);
-    this._radius = ROCK_R;
+    theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
+    super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), ROCK_V), ROCK_R, theta);
+    // this.theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x); // by default, head towards player
+    // this.vel.set(Math.cos(this.theta), Math.sin(this.theta), ROCK_V);
+    // this._radius = ROCK_R;
+    this._destroyed = false;
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
   }
-  _onDestroy = () => { if (!this.game.gameOver) this.game.score++ }
+  _onDestroy = () => { 
+    if (!this._destroyed) {
+      this._destroyed = true;
+      if (!this.game.gameOver) this.game.score++;
+    }
+  }
   update = () => {
     if (this._inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
@@ -315,12 +341,13 @@ class Asteroid extends GameObject {
     }
   }
   render = () => {
-    var points = [];
-    OCTAGON.forEach(point => {
-      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
-      points.push(new Vector2(x, y));
-    });
+    // var points = [];
+    // OCTAGON.forEach(point => {
+    //   var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+    //   var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
+    //   points.push(new Vector2(x, y));
+    // });
+    var points = this._points(OCTAGON);
     if (DEBUG) points.push(this.loc.copy());
     tracePoints(points);
   }
@@ -332,27 +359,33 @@ class BigAsteroid extends Asteroid {
     this._radius *= 2;
   }
   _onDestroy = () => { // BUG: getting hit with multiple projectiles on the same frame triggers this twice
-    if (!this.game.gameOver) this.game.score+=3
-    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25)); // splits into 2 asteroids before destroying itself
-    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); // asteroids have same angle +/- 45-60 degrees (pi/6-pi/4 radians)
+    if (!this._destroyed) {
+      this._destroyed = true;
+      if (!this.game.gameOver) this.game.score+=3
+      new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25)); // splits into 2 asteroids before destroying itself
+      new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); // asteroids have same angle +/- 45-60 degrees (pi/6-pi/4 radians)
+      if (this.game.score > 50 && randomChoice([true, false])) new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(-0.1667, 0.1667));
+    }
   }
 }
 
 class Upgrade extends Asteroid {
+  constructor(game, loc, theta=null) {
+    super(game, loc, theta);
+    this.isUpgrade = true;
+  }
   _onDestroy = () => {
-    if (this._inBounds()) {
-      this.game.score += 5;
-      if (this.game.player.weapon.count < 3) this.game.player.weapon.count++;
-    }
-    this.game.upgradeInPlay = false;
+    if (this._inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) this.game.player.weapon.level++;
+    setTimeout(() => { this.game.upgradeInPlay = false }, this.game.asteroidTimer * randomVal([1, 10]));
   }
   render = () => {
-    var points = [];
-    HEXAGON.forEach(point => {
-      var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
-      points.push(new Vector2(x, y));
-    });
+    // var points = [];
+    // HEXAGON.forEach(point => {
+    //   var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
+    //   var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
+    //   points.push(new Vector2(x, y));
+    // });
+    var points = this._points(HEXAGON);
     if (DEBUG) points.push(this.loc.copy());
     tracePoints(points, true, '#0F0');
   }
@@ -463,18 +496,13 @@ class Game {
       }
       switch (size) {
         case 0:
-          new Asteroid(this, new Vector2(x, y));
+          if (!this.upgradeInPlay && this.player.weapon.level < 3 && Math.floor(this.score/75) >= this.player.weapon.level) {
+            new Upgrade(this, new Vector2(x, y));
+            this.upgradeInPlay = true;
+          } else new Asteroid(this, new Vector2(x, y));
           break;
         case 1:
           new BigAsteroid(this, new Vector2(x, y));
-          break;
-        case 2:
-          if (!this.upgradeInPlay) {
-            new Upgrade(this, new Vector2(x, y));
-            this.upgradeInPlay = true;
-          } else {
-            new Asteroid(this, new Vector2(x, y));
-          }
           break;
       }
       if (this.timeToImpact > (DEBUG ? 5000 : 1000)) this.timeToImpact -= 25;
@@ -485,7 +513,7 @@ class Game {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.radius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.radius()) {
-        collisionObj.destroy();
+        if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
         return true;
       }
@@ -493,45 +521,45 @@ class Game {
     return false;
   }
   createGameOverText = () => {
-    let sharpshooter = (this.hits >= this.shots * 0.85);
+    let sharpshooter = (this.shots > 25 && this.hits >= this.shots * 0.9);
     let pacifist = (this.shots === 0);
     // D rank
     let rank = 'D';
-    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER'];
+    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
     if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
     // C rank
     if (sharpshooter && this.score >= 25) {
       rank = 'C';
       commentPool = ['HEATING UP', "LET 'EM COOK"];
     }
-    if (this.score >= 45) {
+    if (this.score >= 50) {
       rank = 'C';
       commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
-    if (sharpshooter && this.score >= 65) {
+    if (sharpshooter && this.score >= 75) {
       rank = 'B';
       commentPool = ["NICE SHOOTIN' TEX", 'LOCKED IN'];
     }
-    if (this.score >= 90) {
+    if (this.score >= 100) {
       rank = 'B';
       commentPool = ['GOOD HUSTLE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A rank
     if (pacifist && this.score >= 108) {
       rank = 'A';
-      commentPool = ['WALK THE PATH', 'EMPTY MIND'];
+      commentPool = ['CHOSEN ONE', 'EMPTY MIND'];
     }
-    if (sharpshooter && this.score >= 120) {
+    if (sharpshooter && this.score >= 150) {
       rank = 'A'; 
-      commentPool = ['HOT SHOT', 'EAGLE EYE'];
+      commentPool = ['HOT SHOT', 'EAGLE EYE', 'SHOW OFF'];
     }
-    if (this.score >= 180) {
+    if (this.score >= 200) {
       rank = 'A';
       commentPool = ['TOP NOTCH', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
-      if (sharpshooter || pacifist || this.score >= 300) {
+      if (sharpshooter || pacifist || this.score >= 450) {
         rank = 'S';
-        commentPool = pacifist ? ['ENLIGHTENED, YOU ARE'] : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'RAW'];
+        commentPool = pacifist ? ['ENLIGHTENED', 'TARTARE'] : ['SEEK HELP', 'TOUCH GRASS', 'CHILL OUT', 'A WINNER IS YOU', 'かっこいい', 'RAW'];
       }
     }
     this.gameOverText = [
