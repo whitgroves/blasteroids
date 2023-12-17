@@ -310,24 +310,18 @@ class Player extends GameObject {
     this.game.checkAsteroidCollision(this); // collision check
   }
   render = () => {
-    // var points = [];
-    // TRIANGLE.forEach(point => {
-    //   var x = this.loc.x + this.radius() * Math.cos(point + this.theta);
-    //   var y = this.loc.y + this.radius() * Math.sin(point + this.theta);
-    //   points.push(new Vector2(x, y));
-    // });
     var points = this._points(TRIANGLE);
     tracePoints(points);
   }
 }
 
 class Asteroid extends GameObject {
-  constructor(game, loc, theta=null) { //}, vel=null, radius=null) {
+  constructor(game, loc, theta=null, shape=null) { //}, vel=null, radius=null) {
     theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
     super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), ROCK_V), ROCK_R, theta);
     this._destroyed = false;
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
-    this.shape = OCTAGON; // randomChoice([OCTAGON, PENTAGON]);
+    this.shape = shape ? shape : OCTAGON;
     this.color = LINE_COLOR;
     this.shape = this.shape.map((x) => x += randomChoice([1, -1]) * randomVal(0, 0.25));
   }
@@ -371,7 +365,7 @@ class Upgrade extends Asteroid {
   constructor(game, loc, theta=null) {
     super(game, loc, theta);
     this.isUpgrade = true;
-    this.shape = HEXAGON;
+    this.shape = HEXAGON; // want to be a regular shape so player knows its safe
     this.color = '#0F0';
   }
   _onDestroy = () => {
@@ -382,8 +376,8 @@ class Upgrade extends Asteroid {
 
 class Comet extends Asteroid {
   constructor(game, loc, theta=null) {
-    super(game, loc, theta);
-    this.shape = PENTAGON;
+    super(game, loc, theta, PENTAGON);
+    // this.shape = PENTAGON;
     this.color = '#F80';
     this._origin = this.theta;
     this._inert = false;
@@ -405,7 +399,7 @@ class Comet extends Asteroid {
   }
 }
 
-// class Alien extends Asteroid {
+// class UFO extends Asteroid {
 //   constructor(game, loc, theta=null) {
 //     super(game, loc, theta);
 //   }
@@ -532,6 +526,8 @@ class Game {
       if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // new upgrade every 75 levels
         spawnClass = Upgrade;
         this.upgradeInPlay = true;
+      } else if (this.score > 180) {
+        spawnClass = randomChoice([Asteroid, BigAsteroid, Comet]);
       } else if (this.score > 90) {
         spawnClass = randomChoice([Asteroid, Asteroid, BigAsteroid, BigAsteroid, Comet]);
       } else if (this.score > 3) {
@@ -569,7 +565,7 @@ class Game {
     }
     if (this.score >= 50) {
       rank = 'C';
-      commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
+      commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 75) {
@@ -578,20 +574,20 @@ class Game {
     }
     if (this.score >= 100) {
       rank = 'B';
-      commentPool = ['GOOD HUSTLE', 'SOLID', 'RESPECT+', 'WELL DONE'];
+      commentPool = ['GOOD HUSTLE', 'VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A rank
     if (pacifist && this.score >= 108) {
       rank = 'A';
       commentPool = ['CHOSEN ONE', 'EMPTY MIND'];
     }
-    if (sharpshooter && this.score >= 150) {
+    if (sharpshooter && this.score >= 180) {
       rank = 'A'; 
       commentPool = ['HOT SHOT', 'EAGLE EYE', 'SHOW OFF'];
     }
-    if (this.score >= 200) {
+    if (this.score >= 250) {
       rank = 'A';
-      commentPool = ['TOP NOTCH', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
+      commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 450) {
         rank = 'S';
         commentPool = pacifist ? ['ENLIGHTENED', 'TARTARE'] : ['SEEK HELP', 'TOUCH GRASS', 'CHILL OUT', 'A WINNER IS YOU', 'かっこいい', 'RAW'];
