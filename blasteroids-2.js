@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.17.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.17.1'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -46,7 +46,11 @@ const ROCK_V = 0.3;          // velocity
 
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
-const COMET_V = ROCK_V * 1.5;
+const COMET_V = ROCK_V * 1.2;
+
+// ufo
+const UFO_V = ROCK_V * 0.8;
+const TRIANGLE_2 = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 
@@ -172,23 +176,33 @@ class Projectile extends GameObject {
 //   }
 // }
 
-const MAX_WEAPON_LVL = 3;
+const MAX_WEAPON_LVL = 4;
+const OFFSET_RATIO = PLAYER_R * 0.35; // it just works
 class PlayerWeapon {
   constructor(level=1) { this.level = level }
   fire(game, loc, theta) {
     switch (this.level) {
+      case 4:
+        let xo4 = Math.sin(theta) * OFFSET_RATIO;
+        let yo4 = Math.cos(theta) * OFFSET_RATIO;
+        let cone4 = 0.03125; // 1 / 32
+        let cone4_sm = 0.0078125; // 1 / 128
+        new Projectile(game, new Vector2(loc.x-xo4*3, loc.y+yo4*3), theta+(Math.PI*cone4));
+        new Projectile(game, new Vector2(loc.x-xo4, loc.y+yo4), theta+(Math.PI*cone4_sm));
+        new Projectile(game, new Vector2(loc.x+xo4, loc.y-yo4), theta-(Math.PI*cone4_sm));
+        new Projectile(game, new Vector2(loc.x+xo4*3, loc.y-yo4*3), theta-(Math.PI*cone4));
+        break;
       case 3:
-        let coneRatio = 0.0625; // 1/16
+        let cone3 = 0.0625; // 1/16
         new Projectile(game, loc, theta);
-        new Projectile(game, loc, theta+(Math.PI*coneRatio));
-        new Projectile(game, loc, theta-(Math.PI*coneRatio));
+        new Projectile(game, loc, theta+(Math.PI*cone3));
+        new Projectile(game, loc, theta-(Math.PI*cone3));
         break;
       case 2:
-        let offsetRatio = PLAYER_R * 0.35; // it just works
-        let x_off = Math.sin(theta) * offsetRatio;
-        let y_off = Math.cos(theta) * offsetRatio;
-        new Projectile(game, new Vector2(loc.x-x_off, loc.y+y_off), theta);
-        new Projectile(game, new Vector2(loc.x+x_off, loc.y-y_off), theta);
+        let xo2 = Math.sin(theta) * OFFSET_RATIO;
+        let yo2 = Math.cos(theta) * OFFSET_RATIO;
+        new Projectile(game, new Vector2(loc.x-xo2, loc.y+yo2), theta);
+        new Projectile(game, new Vector2(loc.x+xo2, loc.y-yo2), theta);
         break;
       default:
         new Projectile(game, loc, theta);
@@ -323,7 +337,7 @@ class Asteroid extends GameObject {
     this.isAsteroid = true; // in reality this can be anything so long as the property exists
     this.shape = shape ? shape : OCTAGON;
     this.color = LINE_COLOR;
-    this.shape = this.shape.map((x) => x += randomChoice([1, -1]) * randomVal(0, 0.25));
+    this.shape = this.shape.map((x) => x += randomChoice([1, -1]) * randomVal(0, 1 / this.shape.length));
   }
   _onDestroy = () => { 
     if (!this._destroyed) {
@@ -369,27 +383,28 @@ class Upgrade extends Asteroid {
     this.color = '#0F0';
   }
   _onDestroy = () => {
-    if (this._inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) this.game.player.weapon.level++;
-    setTimeout(() => { this.game.upgradeInPlay = false }, this.game.asteroidTimer * randomVal([1, 10]));
+    if (!this._destroyed) {
+      if (this._inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) this.game.player.weapon.level++;
+      setTimeout(() => { this.game.upgradeInPlay = false }, this.game.asteroidTimer * randomVal([1, 10]));
+    }
   }
 }
 
 class Comet extends Asteroid {
   constructor(game, loc, theta=null) {
     super(game, loc, theta, PENTAGON);
-    // this.shape = PENTAGON;
     this.color = '#F80';
-    this._origin = this.theta;
-    this._inert = false;
-    setTimeout(() => this._inert = true, 1000);
+    this._chaseFrames = 0;
+    this._chaseLimit = FPS; // chase for 1s
+    this._vel = COMET_V;
   }
   update = () => {
-    if (!this._inert) {
+    if (this._chaseFrames < this._chaseLimit) {
       let newTheta = Math.atan2(this.game.player.loc.y-this.loc.y, this.game.player.loc.x-this.loc.x);
-      newTheta = Math.max(this.theta*0.9, Math.min(newTheta, this.theta*1.1));
       let dt = newTheta - this.theta;
-      this.theta += 0.1 * dt; //= Math.max(Math.min(this._origin-ratio, this.theta-ratio), Math.min(newTheta, Math.max(this._origin+ratio, this.theta+ratio)));
-      this.vel.set(Math.cos(this.theta), Math.sin(this.theta), COMET_V);
+      this.theta += 0.05 * dt;
+      this.vel.set(Math.cos(this.theta), Math.sin(this.theta), this._vel);
+      this._chaseFrames += 1;
     }
     if (this._inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
@@ -399,25 +414,42 @@ class Comet extends Asteroid {
   }
 }
 
-// class UFO extends Asteroid {
-//   constructor(game, loc, theta=null) {
-//     super(game, loc, theta);
-//   }
-//   update = () => {
-//     this.theta = Math.atan2(this.game.player.loc.y-this.loc.y, this.game.player.loc.x-this.loc.x);
-//     this.vel.set(Math.cos(this.theta), Math.sin(this.theta), COMET_V);
-//     if (this._inBounds()) {
-//       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
-//     } else {
-//       this.destroy();
-//     }
-//   }
-//   render = () => {
-//     var points = this._points(OCTAGON);
-//     if (DEBUG) points.push(this.loc.copy());
-//     tracePoints(points, true, '#F80');
-//   }
-// }
+class EnemyProjectile extends GameObject {
+  constructor(game, loc, theta) { 
+    super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), theta);
+    this.isAsteroid = true; // not exactly true but provides collision behavior
+  }
+  update = () => {
+    if (this._inBounds()) {
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
+    } else {
+      this.destroy();
+    }
+  }
+  render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false, '#F00') }
+}
+
+class UFO extends Comet {
+  constructor(game, loc, theta=null) {
+    super(game, loc, theta);
+    this.color = '#F00';
+    this.shape = TRIANGLE_2;
+    this._chaseLimit = FPS * 5; // chase for 5s
+    this._vel = UFO_V;
+    this.cycle = setTimeout(this.fire, 1000);
+  }
+  fire = () => {
+    new EnemyProjectile(this.game, this.loc.copy(), this.theta);
+    this.cycle = setTimeout(this.fire, 1000); // fire every 1s
+  }
+  _onDestroy = () => { 
+    if (!this._destroyed) {
+      this._destroyed = true;
+      if (!this.game.gameOver) this.game.score++;
+    }
+    clearTimeout(this.cycle); // ceasefire
+  }
+}
 
 class Game {
   constructor() {
@@ -523,15 +555,17 @@ class Game {
         y = randomChoice([0, canvas.height]);
       }
       let spawnClass = null;
-      if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // new upgrade every 75 levels
+      if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // 1 / 75
         spawnClass = Upgrade;
         this.upgradeInPlay = true;
-      } else if (this.score > 180) {
+      } else if (this.score > 360) {
+        spawnClass = randomChoice([Asteroid, BigAsteroid, BigAsteroid, Comet, Comet, UFO]);
+      } else if (this.score > 270) {
         spawnClass = randomChoice([Asteroid, BigAsteroid, Comet]);
       } else if (this.score > 90) {
         spawnClass = randomChoice([Asteroid, Asteroid, BigAsteroid, BigAsteroid, Comet]);
       } else if (this.score > 3) {
-        spawnClass = randomChoice([Asteroid, Asteroid, BigAsteroid]);
+        spawnClass = randomChoice([Asteroid, BigAsteroid]);
       } else {
         spawnClass = Asteroid;
       }
@@ -565,7 +599,7 @@ class Game {
     }
     if (this.score >= 50) {
       rank = 'C';
-      commentPool = pacifist ? ['WAS THAT ON PURPOSE?'] : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
+      commentPool = pacifist ? ['WAS THAT ON PURPOSE?', 'PHONE HOME'] : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 75) {
