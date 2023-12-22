@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.18.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.22.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -16,7 +16,7 @@ if (MOBILE && DEBUG) alert(lastOrientation);
 // game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
-const LINE_COLOR = '#FFF';
+const LINE_COLOR = DEBUG ? '#0F0' : '#FFF';
 const LINE_WIDTH = MOBILE ? 3 : 2;
 const FONT_SIZE = MOBILE ? 45 : 30;
 const FONT_FAM = 'monospace';
@@ -73,6 +73,13 @@ tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an arra
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
   points.forEach(point => { ctx.lineTo(point.x, point.y) });
   ctx.stroke();
+  ctx.closePath();
+}
+dotPoints = (points, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  points.forEach(point => { ctx.fillRect(point.x, point.y, 1, 1) }); // https://stackoverflow.com/a/7813282/3178898
+  ctx.fill();
   ctx.closePath();
 }
 displayText = (text, x, y, color=LINE_COLOR) => {
@@ -324,7 +331,7 @@ class Asteroid extends GameObject {
     this.color = LINE_COLOR;
   }
   _onDestroy = () => { 
-    if (!this._destroyed) {
+    if (!this._destroyed) { // TODO: move this logic into GameObject
       this._destroyed = true;
       if (!this.game.gameOver) this.game.score++;
     }
@@ -338,8 +345,8 @@ class Asteroid extends GameObject {
   }
   render = () => {
     var points = this._points(this.shape);
-    if (DEBUG) points.push(this.loc.copy());
-    tracePoints(points, true, this.color);
+    if (DEBUG) dotPoints(points, this.color);
+    else tracePoints(points, true, this.color);
   }
 }
 
@@ -455,6 +462,53 @@ class UFO extends Asteroid {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
     } else {
       this.destroy();
+    }
+  }
+}
+
+class ExplosionAnimation extends GameObject {
+  constructor(game, loc, color, maxRadius) {
+    super(game, loc);
+    this.color = color;
+    this._radius = 10;
+    this.maxRadius = maxRadius;
+    this.maxFrames = FPS/2; // complete in 1/2s
+    this.currentFrame = 0;
+    this.waves = [];
+  }
+
+  _points = (shape, radius) => { 
+    var points = [];
+    shape.forEach(point => {
+      var x = this.loc.x + radius * Math.cos(point + this.theta);
+      var y = this.loc.y + radius * Math.sin(point + this.theta);
+      points.push(new Vector2(x, y));
+    });
+    return points;
+  }
+
+  update = () => {
+    if (this.currentFrame > this.maxFrames) this.destroy();
+    else {
+      let shape = [];
+      while (shape.length < 10) shape.push(randomVal(0, Math.PI * 2));
+      this.waves.push(shape); // make a new wave at the center
+      let subHex = Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * 255).toString(16); // fade to black
+      if (subHex.length < 2) subHex = '0' + subHex; // low values don't lpad which skews the final hex and creates a flicker
+      this.color = '#' + subHex + subHex + subHex;
+      // console.log(this.color);
+      this.currentFrame++;
+      // // let temp = Math.floor((1 - (this.currentFrame / this.maxFrames)) * 255).toString(16); // gradually fade to black
+      // // this.color = '#' + temp + temp + temp;
+      // // ^ doesn't work as intended but has a cool flicker at the end I want to use later
+    }
+  }
+  render = () => {
+    // this.waves.forEach((waveShape) => { tracePoints(this._points(waveShape), true, this.color) });
+    for (let i = 0; i < this.waves.length; i++) {
+      let waveRadius = ((this.waves.length - i) / this.maxFrames) * this.maxRadius;
+      dotPoints(this._points(this.waves[i], waveRadius), this.color);
+      // tracePoints(this._points(this.waves[i], waveRadius), false, this.color);
     }
   }
 }
@@ -593,6 +647,7 @@ class Game {
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
+        new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.getRadius() * 1.5);
         return true;
       }
     }
@@ -686,4 +741,4 @@ class Game {
   }
 }
 
- var game = new Game();
+var game = new Game();
