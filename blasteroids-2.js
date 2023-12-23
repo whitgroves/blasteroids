@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.22.1'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.22.3'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -64,7 +64,7 @@ resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canva
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
-getScale = () => { return MOBILE && lastOrientation !== 'portrait-primary' ? 0.5 : 1 }
+getScale = () => { return MOBILE && lastOrientation !== 'portrait-primary' ? 0.35 : 1 }
 
 tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
@@ -175,8 +175,8 @@ class PlayerWeapon {
   fire(game, loc, theta) {
     switch (this.level) {
       case 4:
-        let xo4 = Math.sin(theta) * OFFSET_RATIO;
-        let yo4 = Math.cos(theta) * OFFSET_RATIO;
+        let xo4 = Math.sin(theta) * OFFSET_RATIO * getScale();
+        let yo4 = Math.cos(theta) * OFFSET_RATIO * getScale();
         let cone4 = 0.03125; // 1 / 32
         let cone4_sm = 0.0078125; // 1 / 128
         new Projectile(game, new Vector2(loc.x-xo4*3, loc.y+yo4*3), theta+(Math.PI*cone4));
@@ -191,8 +191,8 @@ class PlayerWeapon {
         new Projectile(game, loc, theta-(Math.PI*cone3));
         break;
       case 2:
-        let xo2 = Math.sin(theta) * OFFSET_RATIO;
-        let yo2 = Math.cos(theta) * OFFSET_RATIO;
+        let xo2 = Math.sin(theta) * OFFSET_RATIO * getScale();
+        let yo2 = Math.cos(theta) * OFFSET_RATIO * getScale();
         new Projectile(game, new Vector2(loc.x-xo2, loc.y+yo2), theta);
         new Projectile(game, new Vector2(loc.x+xo2, loc.y-yo2), theta);
         break;
