@@ -2,13 +2,13 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.23.1'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.23.2'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 const DTAP_TIMEOUT = 300;
 const LTAP_TIMEOUT = 500; // how long to wait for a long press
-const TILT_THRESH = 0.5;
+const TILT_THRESH = 0.55;
 
 let lastOrientation = screen.orientation.type;
 if (MOBILE && DEBUG) alert(lastOrientation);
@@ -50,7 +50,7 @@ const ROCK_V = 0.3;          // velocity
 
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
-const COMET_V = ROCK_V * 1.7;
+const COMET_V = ROCK_V * 1.5;
 const COMET_TA = 0.009; // per-frame turn amount (radians)
 
 // ufo
@@ -731,7 +731,7 @@ class Game {
       rank = 'A'; 
       commentPool = ['HOT SHOT', 'EAGLE EYE'];
     }
-    if (this.score >= 300) {
+    if (this.score >= 250) {
       rank = 'A';
       commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 400) {
