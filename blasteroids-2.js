@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.22.3'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.23.1'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -78,7 +78,7 @@ tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an arra
 dotPoints = (points, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.fillStyle = color;
-  points.forEach(point => { ctx.fillRect(point.x, point.y, 1, 1) }); // https://stackoverflow.com/a/7813282/3178898
+  points.forEach(point => { ctx.fillRect(point.x, point.y, LINE_WIDTH, LINE_WIDTH) }); // https://stackoverflow.com/a/7813282/3178898
   ctx.fill();
   ctx.closePath();
 }
@@ -157,7 +157,7 @@ class GameObject {
 }
 
 class Projectile extends GameObject {
-  constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), theta) }
+  constructor(game, loc, theta) { super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), 0, theta) }
   update = () => {
     let hit = this.game.checkAsteroidCollision(this);
     if (!hit && this._inBounds()) {
@@ -467,18 +467,17 @@ class UFO extends Asteroid {
 }
 
 class ExplosionAnimation extends GameObject {
-  constructor(game, loc, color=LINE_COLOR, theta, maxRadius) {
-    super(game, loc, null, 10, theta);
+  constructor(game, loc, color=LINE_COLOR, maxRadius) {
+    super(game, loc, null, (maxRadius * 0.5)); 
     this.color = color;
     this._r = parseInt(color[1]+color[1], 16);
     this._g = parseInt(color[2]+color[2], 16);
     this._b = parseInt(color[3]+color[3], 16);
     this.maxRadius = maxRadius;
-    this.maxFrames = FPS/2; // complete in 1/2s
+    this.maxFrames = FPS * 0.25; // complete in ~1/4s
     this.currentFrame = 0;
     this.waves = [];
   }
-
   _points = (shape, radius) => { 
     var points = [];
     shape.forEach(point => {
@@ -488,15 +487,11 @@ class ExplosionAnimation extends GameObject {
     });
     return points;
   }
-
   update = () => {
     if (this.currentFrame > this.maxFrames) this.destroy();
     else {
-      let shape = [];
-      while (shape.length < 10) {
-        let _theta = randomVal(this.theta, (Math.PI * 2) + this.theta);
-        shape.push(_theta);
-      }
+      let shape = []; // NOTE: tried using theta to shape an impact cone but the full ring looks better 90% of the time
+      while (shape.length < 5) { shape.push(randomVal(0, Math.PI * 2)); }
       this.waves.push(shape); // make a new wave at the center
       let channels = [this._r, this._g, this._b];
       let colorHex = [];
@@ -506,18 +501,13 @@ class ExplosionAnimation extends GameObject {
         colorHex.push(subHex);
       })
       this.color = '#' + colorHex[0] + colorHex[1] + colorHex[2];
-      // let subHex = Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * 255).toString(16); // fade to black
-      // if (subHex.length < 2) subHex = '0' + subHex; // low values don't lpad which skews the final hex and creates a flicker
-      // this.color = '#' + subHex + subHex + subHex;
       this.currentFrame++;
-      // // let temp = Math.floor((1 - (this.currentFrame / this.maxFrames)) * 255).toString(16); // gradually fade to black
-      // // this.color = '#' + temp + temp + temp;
-      // // ^ doesn't work as intended but has a cool flicker at the end I want to use later
     }
   }
   render = () => {
     for (let i = 0; i < this.waves.length; i++) {
-      let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius;
+      // let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius; // ALT: treats all waves the same and makes a (cool) impact ring
+      let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius + (this.waves.length - i);
       dotPoints(this._points(this.waves[i], waveRadius), this.color);
     }
   }
@@ -706,7 +696,7 @@ class Game {
       if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
-        new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.theta, gameObj.getRadius() * 1.5);
+        new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.getRadius());
         return true;
       }
     }
