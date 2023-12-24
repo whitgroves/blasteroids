@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.23.2'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.23.3'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -16,6 +16,7 @@ if (MOBILE && DEBUG) alert(lastOrientation);
 // game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
+const SHAPE_FILL = '#000';
 const LINE_COLOR = DEBUG ? '#0F0' : '#FFF';
 const LINE_WIDTH = MOBILE ? 3 : 2;
 const FONT_SIZE = MOBILE ? 45 : 30;
@@ -23,6 +24,7 @@ const FONT_FAM = 'monospace';
 const PADDING = 10;
 const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
+const PARALLAX = 0.3333 // ratio for parallax effect
 
 // player
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
@@ -66,13 +68,15 @@ resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canva
 }
 getScale = () => { return MOBILE && lastOrientation !== 'portrait-primary' ? 0.35 : 1 }
 
-tracePoints = (points, enclose=true, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
+tracePoints = (points, enclose=true, color=LINE_COLOR, fill=SHAPE_FILL) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
+  ctx.lineWidth = LINE_WIDTH; // lineWidth = 3 + ctx.fill() creates the shading effect
+  ctx.fillStyle = fill;
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
   points.forEach(point => { ctx.lineTo(point.x, point.y) });
   ctx.stroke();
+  ctx.fill();
   ctx.closePath();
 }
 dotPoints = (points, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
@@ -217,6 +221,7 @@ class Player extends GameObject {
     this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
     this.weapon = new PlayerWeapon();
+    this.color = '#AAA';
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -315,10 +320,7 @@ class Player extends GameObject {
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
     this.game.checkAsteroidCollision(this); // collision check
   }
-  render = () => {
-    var points = this._points(TRIANGLE);
-    tracePoints(points);
-  }
+  render = () => { tracePoints(this._points(TRIANGLE), true, this.color, this.color); } // TODO: change color based on upgrade level
 }
 
 class Asteroid extends GameObject {
@@ -368,7 +370,7 @@ class BigAsteroid extends Asteroid {
   }
 }
 
-class Upgrade extends Asteroid {
+class Upgrade extends Asteroid { // TODO: add glow effect
   constructor(game, loc) {
     super(game, loc);
     this.isUpgrade = true; // collision exception
@@ -384,6 +386,7 @@ class Upgrade extends Asteroid {
       setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
     }
   }
+  render = () => { tracePoints(this._points(this.shape), true, this.color); }
 }
 
 class Comet extends Asteroid {
@@ -474,7 +477,7 @@ class ExplosionAnimation extends GameObject {
     this._g = parseInt(color[2]+color[2], 16);
     this._b = parseInt(color[3]+color[3], 16);
     this.maxRadius = maxRadius;
-    this.maxFrames = FPS * 0.25; // complete in ~1/4s
+    this.maxFrames = FPS * 0.5; // complete in ~1/2s
     this.currentFrame = 0;
     this.waves = [];
   }
@@ -490,9 +493,11 @@ class ExplosionAnimation extends GameObject {
   update = () => {
     if (this.currentFrame > this.maxFrames) this.destroy();
     else {
-      let shape = []; // NOTE: tried using theta to shape an impact cone but the full ring looks better 90% of the time
-      while (shape.length < 5) { shape.push(randomVal(0, Math.PI * 2)); }
-      this.waves.push(shape); // make a new wave at the center
+      if (this.currentFrame < this.maxFrames * 0.5) {
+        let shape = []; // NOTE: tried using theta to shape an impact cone but the full ring looks better 90% of the time
+        while (shape.length < 5) { shape.push(randomVal(0, Math.PI * 2)); }
+        this.waves.push(shape); // make a new wave at the center
+      }
       let channels = [this._r, this._g, this._b];
       let colorHex = [];
       channels.forEach(channel => {
@@ -654,8 +659,14 @@ class Game {
     this.timeToImpact = DEBUG ? 5000 : 2500;
     this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
     this.upgradeInPlay = false;
+    this.createBgStars();
   }
-  spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing timer
+  createBgStars = () => {
+    this.bgStars = [];
+    for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width * 2), randomVal(-canvas.height, canvas.height * 2))); }
+    // dotPoints(this.bgStars);
+  }
+  spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing  timer
     if (!this.gameOver) {
       let x = null;
       let y = null;
@@ -756,6 +767,10 @@ class Game {
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (this.bgStars) {
+      if (!this.gameOver) this.bgStars.forEach(point => { point.x -= this.player.vel.x * PARALLAX; point.y -= this.player.vel.y * PARALLAX; });
+      dotPoints(this.bgStars);
+    }
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = PADDING * getScale()
     let fontSize = FONT_SIZE * getScale()
