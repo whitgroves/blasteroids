@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.23.3'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.24.2'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -782,7 +782,14 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (this.bgStars) {
-      if (!this.gameOver) this.bgStars.forEach(point => { point.x -= this.player.vel.x * PARALLAX; point.y -= this.player.vel.y * PARALLAX; });
+      if (!this.gameOver) { // couldn't use _inBounds() since check is per-axis
+        let moveX = 0 < this.player.loc.x && this.player.loc.x < canvas.width;
+        let moveY = 0 < this.player.loc.y && this.player.loc.y < canvas.height;
+        this.bgStars.forEach(point => { 
+          if (moveX) { point.x -= this.player.vel.x * PARALLAX; }
+          if (moveY) { point.y -= this.player.vel.y * PARALLAX; }
+        });
+      }
       dotPoints(this.bgStars);
     }
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
