@@ -33,6 +33,7 @@ const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 const PLAYER_F = 0.02;                 // friction
 const T_OFFSET = Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
+const PLAYER_C = '#AAA'                // player (and player projectile) color
 
 // player weapon
 const MAX_WEAPON_LVL = 4;
@@ -113,6 +114,18 @@ displayTextBox = (textLines, x, y) => {
 randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
 randomVal = (min, max) => { return Math.random() * (max - min) + min } // output range is [min, max)
 // randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max))) } // output range is [min, max)
+randomSpawn = () => { // generates a random spawn point on the edge of the screen
+  let x = null;
+  let y = null;
+  if (randomChoice([true, false])) { 
+    x = randomChoice([0, canvas.width]);
+    y = randomVal(0, canvas.height);
+  } else {
+    x = randomVal(0, canvas.width);
+    y = randomChoice([0, canvas.height]);
+  }
+  return new Vector2(x, y);
+}
 
 class Vector2 { // I know libraries for this exist but sometimes you want a scoop of vanilla
   constructor(x=0, y=0, scale=1) {
@@ -171,7 +184,7 @@ class Projectile extends GameObject {
       this.destroy();
     }
   }
-  render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false) }
+  render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false, PLAYER_C) }
 }
 
 class PlayerWeapon {
@@ -221,7 +234,7 @@ class Player extends GameObject {
     this.neutral = MOBILE ? new Vector2(0, 22) : null; // neutral position for tilt movement
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
     this.weapon = new PlayerWeapon();
-    this.color = '#AAA';
+    this.color = PLAYER_C;
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -464,6 +477,7 @@ class UFO extends Asteroid {
     if (this._inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
     } else {
+      if (!this.game.gameOver) setTimeout(() => { new UFO(this.game, randomSpawn()); }, this.game.timeToImpact) // if you don't take it out, it comes back
       this.destroy();
     }
   }
@@ -668,15 +682,15 @@ class Game {
   }
   spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing  timer
     if (!this.gameOver) {
-      let x = null;
-      let y = null;
-      if (randomChoice([true, false])) { 
-        x = randomChoice([0, canvas.width]);
-        y = randomVal(0, canvas.height);
-      } else {
-        x = randomVal(0, canvas.width);
-        y = randomChoice([0, canvas.height]);
-      }
+      // let x = null;
+      // let y = null;
+      // if (randomChoice([true, false])) { 
+      //   x = randomChoice([0, canvas.width]);
+      //   y = randomVal(0, canvas.height);
+      // } else {
+      //   x = randomVal(0, canvas.width);
+      //   y = randomChoice([0, canvas.height]);
+      // }
       let spawnClass = null;
       if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
         spawnClass = Upgrade;
@@ -696,7 +710,7 @@ class Game {
       } else {
         spawnClass = Asteroid;
       }
-      new spawnClass(this, new Vector2(x, y));
+      new spawnClass(this, randomSpawn()); // new Vector2(x, y));
       if (this.timeToImpact > (DEBUG ? 5000 : 1000)) this.timeToImpact -= 25;
       if (chain) this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
     }
