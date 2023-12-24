@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.24.2'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.24.3'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -62,17 +62,18 @@ const UFO_V = ROCK_V * 0.8;
 const TRIANGLE_2 = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 // const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
 
+// display
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
-getScale = () => { return MOBILE && lastOrientation !== 'portrait-primary' ? 0.35 : 1 }
-
+getScale = () => { return !MOBILE ? 1 : lastOrientation == 'portrait-primary' ? 0.8 : 0.35 }
+getLineWidth = () => { return (!MOBILE ? 2 : lastOrientation == 'portrait-primary' ? 3 : 2.5) }
 tracePoints = (points, enclose=true, color=LINE_COLOR, fill=SHAPE_FILL) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH; // lineWidth = 3 + ctx.fill() creates the shading effect
+  ctx.lineWidth = getLineWidth(); // lineWidth = 2 + ctx.fill() creates the psuedo-shading effect
   ctx.fillStyle = fill;
   if (enclose) ctx.moveTo(points[points.length-1].x, points[points.length-1].y);
   points.forEach(point => { ctx.lineTo(point.x, point.y) });
@@ -83,7 +84,7 @@ tracePoints = (points, enclose=true, color=LINE_COLOR, fill=SHAPE_FILL) => { // 
 dotPoints = (points, color=LINE_COLOR) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.fillStyle = color;
-  points.forEach(point => { ctx.fillRect(point.x, point.y, LINE_WIDTH, LINE_WIDTH) }); // https://stackoverflow.com/a/7813282/3178898
+  points.forEach(point => { ctx.fillRect(point.x, point.y, getLineWidth(), getLineWidth()) }); // https://stackoverflow.com/a/7813282/3178898
   ctx.fill();
   ctx.closePath();
 }
@@ -111,6 +112,7 @@ displayTextBox = (textLines, x, y) => {
   }
 }
 
+// rng
 randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
 randomVal = (min, max) => { return Math.random() * (max - min) + min } // output range is [min, max)
 // randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max))) } // output range is [min, max)
@@ -222,7 +224,7 @@ class PlayerWeapon {
 class Player extends GameObject {
   constructor(game) {
     resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
-    super(game, new Vector2(canvas.width/2, canvas.height/2));
+    super(game, new Vector2(canvas.width*0.5, canvas.height*0.5));
     this.accel = PLAYER_A;
     this.frict = PLAYER_F;
     this.theta = 0;
@@ -261,6 +263,7 @@ class Player extends GameObject {
     }
   }
   _onTouchStart = (event) => {
+    event.preventDefault();
     this.target = new Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.firing = true;
   }
@@ -289,7 +292,9 @@ class Player extends GameObject {
     if (lastOrientation != screenOrientation) {
       lastOrientation = screenOrientation;
       if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
-      resizeCanvas();
+      resizeCanvas();                                 // adjust for new dims
+      this.game.createBgStars();                      // stars need to be redrawn because of new dims
+      // this.loc = new Vector2(canvas.width*0.5, canvas.height*0.5); // reset location so not offscreen
       if (DEBUG) alert('x:'+canvas.width+' y:'+canvas.height);
     }
   }
@@ -300,6 +305,7 @@ class Player extends GameObject {
   _onDestroy = () => {
     this.game.gameOver = true;
     this.deregisterInputs();
+    new ExplosionAnimation(this.game, this.loc.copy(), this.color, 400*getScale(), 25);
   }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH}
   _safeUpdateVelocity = (v) => {
@@ -312,7 +318,7 @@ class Player extends GameObject {
     // rotate towards target
     if (this.target) { 
       this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x) + T_OFFSET;
-      setTimeout(() => this.target = null, TIME_STEP * 30); // stay on target for the next 30 frames so shots land on mobile
+      setTimeout(() => this.target = null, 1000); // stay on target for 1s so shots land more consistently
     } else if (this._isTilted()) {
       this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) + T_OFFSET;
     }
@@ -484,8 +490,8 @@ class UFO extends Asteroid {
 }
 
 class ExplosionAnimation extends GameObject {
-  constructor(game, loc, color=LINE_COLOR, maxRadius) {
-    super(game, loc, null, (maxRadius * 0.5)); 
+  constructor(game, loc, color=LINE_COLOR, maxRadius, waveDensity=5) {
+    super(game, loc, null, (maxRadius * 0.5));
     this.color = color;
     this._r = parseInt(color[1]+color[1], 16);
     this._g = parseInt(color[2]+color[2], 16);
@@ -494,6 +500,7 @@ class ExplosionAnimation extends GameObject {
     this.maxFrames = FPS * 0.5; // complete in ~1/2s
     this.currentFrame = 0;
     this.waves = [];
+    this.waveDensity = waveDensity;
   }
   _points = (shape, radius) => { 
     var points = [];
@@ -509,7 +516,7 @@ class ExplosionAnimation extends GameObject {
     else {
       if (this.currentFrame < this.maxFrames * 0.5) {
         let shape = []; // NOTE: tried using theta to shape an impact cone but the full ring looks better 90% of the time
-        while (shape.length < 5) { shape.push(randomVal(0, Math.PI * 2)); }
+        while (shape.length < this.waveDensity) { shape.push(randomVal(0, Math.PI * 2)); }
         this.waves.push(shape); // make a new wave at the center
       }
       let channels = [this._r, this._g, this._b];
@@ -608,12 +615,11 @@ class Game {
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
-    } else {
-      if (this.paused) { // recalibrate on resume
-        this.player.neutral = null;
-        this.handlePause();
-      } 
-      if (this.gameOver) this.newGame(); // restart
+    } else if (this.paused) { // recalibrate
+        this.player.neutral = null; // neutral pos will reset on resume
+        if (DEBUG) alert('gyroscope will reset on resume');
+        // this.handlePause(); // immediately unpause to get new neutral pos
+      // if (this.gameOver) this.newGame(); // restart
     }
   }
   _handleTouchEnd = (event) => { // long press
@@ -642,7 +648,7 @@ class Game {
         DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,',
                                       'MERRY CHRISTMAS', 'HAPPY HOLIDAYS'])
       ]
-      if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO CALIBRATE');
+      // if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO SET GYRO');
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
@@ -661,6 +667,7 @@ class Game {
     this.cleanupIds = [];
   }
   newGame = () => {
+    resizeCanvas(); // covering all bases
     this.paused = false;
     this.pauseTime = null;
     this.gameOver = false;
@@ -677,8 +684,7 @@ class Game {
   }
   createBgStars = () => {
     this.bgStars = [];
-    for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width * 2), randomVal(-canvas.height, canvas.height * 2))); }
-    // dotPoints(this.bgStars);
+    for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width*2), randomVal(-canvas.height, canvas.height*2))); }
   }
   spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing  timer
     if (!this.gameOver) {
