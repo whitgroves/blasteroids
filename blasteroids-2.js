@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.24.3'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.25.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -18,7 +18,7 @@ const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const SHAPE_FILL = '#000';
 const LINE_COLOR = DEBUG ? '#0F0' : '#FFF';
-const LINE_WIDTH = MOBILE ? 3 : 2;
+// const LINE_WIDTH = MOBILE ? 3 : 2;
 const FONT_SIZE = MOBILE ? 45 : 30;
 const FONT_FAM = 'monospace';
 const PADDING = 10;
@@ -63,13 +63,13 @@ const TRIANGLE_2 = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 // const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
 
 // display
+getScale = () => { return !MOBILE ? 1 : lastOrientation == 'portrait-primary' ? 0.8 : 0.35 }
+getLineWidth = () => { return (!MOBILE ? 2 : lastOrientation == 'portrait-primary' ? 3 : 2.5) }
 getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
 }
-getScale = () => { return !MOBILE ? 1 : lastOrientation == 'portrait-primary' ? 0.8 : 0.35 }
-getLineWidth = () => { return (!MOBILE ? 2 : lastOrientation == 'portrait-primary' ? 3 : 2.5) }
 tracePoints = (points, enclose=true, color=LINE_COLOR, fill=SHAPE_FILL) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
   ctx.strokeStyle = color;
@@ -111,11 +111,22 @@ displayTextBox = (textLines, x, y) => {
     displayText(textLines[i], xLeft+PADDING * getScale(), yTop+(FONT_SIZE+PADDING)*(i+1) * getScale());
   }
 }
+getColorChannels = (color) => { // "#FFF" -> "FF", "FF", "FF" -> [256, 256, 256]
+  let _r = parseInt(color[1]+color[1], 16); 
+  let _g = parseInt(color[2]+color[2], 16);
+  let _b = parseInt(color[3]+color[3], 16);
+  return [_r, _g, _b];
+}
+fadeColor = (color, alpha) => {
+  return '#' + getColorChannels(color).map(channel => Math.floor(alpha * channel).toString(16))
+                                      .map(channel => ('0' + channel).slice(-2)) // lpad to prevent flicker for low values
+                                      .reduce((a, b) => a + b);
+}
 
 // rng
 randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
 randomVal = (min, max) => { return Math.random() * (max - min) + min } // output range is [min, max)
-// randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max))) } // output range is [min, max)
+// randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max + 1))) } // output range is [min, max]
 randomSpawn = () => { // generates a random spawn point on the edge of the screen
   let x = null;
   let y = null;
@@ -237,6 +248,7 @@ class Player extends GameObject {
     this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
     this.weapon = new PlayerWeapon();
     this.color = PLAYER_C;
+    // new ParticleTrailAnimation(game, this);
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -413,11 +425,13 @@ class Comet extends Asteroid {
     super(game, loc, null, PENTAGON);
     this.color = '#F80';
     this._turnAmt = randomVal(-COMET_TA, COMET_TA); //randomChoice([-1, 1]) * 0.002;
+    this._trail = new ParticleTrailAnimation(game, this);
   }
   _onDestroy = () => { 
     if (!this._destroyed) {
       this._destroyed = true;
       if (!this.game.gameOver) this.game.score+=2;
+      this._trail.destroy();
     }
   }
   update = () => {
@@ -489,13 +503,22 @@ class UFO extends Asteroid {
   }
 }
 
+// class Animation extends GameObject {
+//   constructor(game, loc, color) {
+//     super(game, loc);
+//     this.color = color;
+//   }
+// }
+
 class ExplosionAnimation extends GameObject {
   constructor(game, loc, color=LINE_COLOR, maxRadius, waveDensity=5) {
     super(game, loc, null, (maxRadius * 0.5));
     this.color = color;
-    this._r = parseInt(color[1]+color[1], 16);
-    this._g = parseInt(color[2]+color[2], 16);
-    this._b = parseInt(color[3]+color[3], 16);
+    this.baseColor = color;
+    // this.channels = getColorChannels(color);
+    // this._r = parseInt(color[1]+color[1], 16);
+    // this._g = parseInt(color[2]+color[2], 16);
+    // this._b = parseInt(color[3]+color[3], 16);
     this.maxRadius = maxRadius;
     this.maxFrames = FPS * 0.5; // complete in ~1/2s
     this.currentFrame = 0;
@@ -519,14 +542,19 @@ class ExplosionAnimation extends GameObject {
         while (shape.length < this.waveDensity) { shape.push(randomVal(0, Math.PI * 2)); }
         this.waves.push(shape); // make a new wave at the center
       }
-      let channels = [this._r, this._g, this._b];
-      let colorHex = [];
-      channels.forEach(channel => {
-        let subHex = Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * channel).toString(16); // fade to black
-        if (subHex.length < 2) subHex = '0' + subHex; // low values don't lpad which skews the final hex and creates a flicker
-        colorHex.push(subHex);
-      })
-      this.color = '#' + colorHex[0] + colorHex[1] + colorHex[2];
+      // // let channels = [this._r, this._g, this._b];
+      // let colorHex = [];
+      // this.channels.forEach(channel => {
+      //   let subHex = Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * channel).toString(16); // fade to black
+      //   if (subHex.length < 2) subHex = '0' + subHex; // low values don't lpad which skews the final hex and creates a flicker
+      //   colorHex.push(subHex);
+      // })
+      // this.color = '#' + colorHex[0] + colorHex[1] + colorHex[2];
+      // this.color = '#' + this.channels
+      //                       .map(channel => Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * channel).toString(16))
+      //                       .map(channel => ('0' + channel).slice(-2)) // lpad to prevent flicker for low values
+      //                       .reduce((a, b) => a + b);
+      this.color = fadeColor(this.baseColor, (1 - (this.currentFrame / this.maxFrames)**2));
       this.currentFrame++;
     }
   }
@@ -587,6 +615,49 @@ class ExplosionAnimation extends GameObject {
 //     }
 //   }
 // }
+
+class ParticleTrailAnimation extends GameObject {
+  constructor(game, sourceObj, maxWaves=10) {
+    super(game);
+    this.sourceObj = sourceObj;
+    this.color = sourceObj.color;
+    // this.channels = getColorChannels(color);
+    this.waves = [];
+    this.waveDensity = 5;
+    this.maxWaves = maxWaves; // trail length
+    this.waveColors = Array.from({length: maxWaves}, (c, i) => fadeColor(this.color, (1 - (i / maxWaves)))); // **2
+    // ^ lookup table for fade out colors so we only calc once
+
+    // for (let i = 0; i < maxWaves; i++) {
+
+    // }
+  }
+  update = () => {
+    if (this.game.gameOver) this.destroy();
+    else {
+      // let points = [];
+      let xOffset = Math.sin(this.sourceObj.theta) * this.sourceObj.getRadius();
+      let yOffset = Math.cos(this.sourceObj.theta) * this.sourceObj.getRadius();
+      let points = Array.from({length: this.waveDensity}, (p, i) => {
+        let coeff = randomChoice([-1, 1]); // x and y offsets should always have opposite signs
+        return new Vector2(this.sourceObj.loc.x + coeff * randomVal(0, xOffset),
+                           this.sourceObj.loc.y - coeff * randomVal(0, yOffset));
+      })
+      // while (points.length < this.waveDensity) {
+      //   points.push(new Vector2(this.sourceObj.loc.x+randomVal(-xOffset, xOffset),
+      //                           this.sourceObj.loc.y+randomVal(-yOffset, yOffset)));
+      // }
+      this.waves.unshift(points); // newest wave goes at the front, closest to source
+      this.waves = this.waves.slice(0, this.maxWaves); // waves < maxWaves will just return existing array
+    }
+  }
+  render = () => { 
+    for (let i = 0; i < this.waves.length; i++) {
+      // let waveColor = '#' + getColorChannels(this.color).reduce((a, b))
+      dotPoints(this.waves[i], this.waveColors[i]);
+    }
+  }
+}
 
 class Game {
   constructor() {
