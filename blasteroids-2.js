@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.25.1'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.25.2'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -43,14 +43,15 @@ const PROJ_L = 10; // length
 
 // upgrade
 const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI / 6), (3 * Math.PI / 2), (11 * Math.PI / 6)];
-const UPGRADE_V = 0.2; 
+const UPGRADE_R = PLAYER_R * 2.5
+const UPGRADE_V = 0.2;
 const UPGRADE_C = '#0F0';
 
 // asteroid 
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
-const ROCK_R = PLAYER_R * 2; // radius
-const ROCK_V = 0.3;          // velocity
-const ROCK_C = '#FFF'        // color
+const ROCK_R = PLAYER_R * 2;
+const ROCK_V = 0.3;
+const ROCK_C = '#FFF'
 
 // big asteroid
 const BIGROCK_R = ROCK_R * 2
@@ -188,15 +189,24 @@ class GameObject {
     });
     return points;
   }
-  _onDestroy = () => {} // virtual, wraps destroy() for subclass
+  _onDestroy = () => {} // virtual, wraps destruction logic
+  _onDestroyAnimate = () => {} // virtual, wraps destruction animations
   destroy = () => {
     if (!this.destroyed) { // prevent calls on the same frame from activating twice
       this.destroyed = true;
       this._onDestroy();
+      if (this.inBounds()) { this._onDestroyAnimate(); }
       this.game.deregister(this.objId); // stop updating/rendering and queue for cleanup
     }
   }
-  update = () => {} // virtual
+  _updateInBounds = () => {} // virtual, wraps update()
+  update = () => {
+    if (this.inBounds()) { 
+      this._updateInBounds();
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
+    }
+    else { this.destroy(); } 
+  }
   render = () => {} // virtual
 }
 
@@ -368,40 +378,45 @@ class Player extends GameObject {
 }
 
 class Hazard extends GameObject {
-  constructor(game, loc, vel, theta, radius, shape, color, value) {
-    super(game, loc, vel, radius, theta);
+  constructor(game, loc, vscale, theta, radius, shape, color, value) {
+    theta = theta || Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
+    super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), vscale), radius, theta);
     this.shape = shape;
     this.color = color;
     this.value = value;
     this.isHazard = true; // collision filter
   }
-  _onDestroyInBounds = () => {} // virtual, wraps subclass destruction logic
-  _onDestroyAnimation = () => {} // virtual, wraps subclass destruction animations
-  _onDestroy = () => { // TODO: move this into GameObject
+  _onDestroyHazard = () => {} // virtual, re-wraps destruction logic
+  _onDestroy = () => {
     if (this.inBounds()) {
-      this._onDestroyInBounds(); // called before score update so subclass can change its value if conditions are met
-      this._onDestroyAnimation();
+      this._onDestroyHazard(); // called before score update so subclass can change its value if conditions are met
+      // this._onDestroyAnimation();
     } 
     if (!this.game.gameOver) { this.game.score += this.value; }
   }
-  _updateHazard = () => {} // virtual, wraps update()
-  update = () => { if (this.inBounds()) { this._updateHazard(); } else { this.destroy(); } }
+  // _updateHazard = () => {} // virtual, wraps update()
+  // update = () => {
+  //   if (this.inBounds()) { 
+  //     this._updateHazard();
+  //     this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
+  //   } else { this.destroy(); } 
+  // }
+  render = () => { tracePoints(this._points(this.shape), true, this.color); }
 }
 
 class Asteroid extends Hazard {
   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
-    theta = theta || Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
     vscale = vscale || ROCK_V;
     radius = radius || ROCK_R;
     shape = shape || OCTAGON;
     color = color || ROCK_C;
     value = value || 1;
-    super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), vscale), theta, radius, shape, color, value);
+    super(game, loc, vscale, theta, radius, shape, color, value);
     this.shape = this.shape.map(x => x += randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
   }
-  _onDestroyAnimation = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()) }
-  _updateHazard = () => { this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); }
-  render = () => { tracePoints(this._points(this.shape), true, this.color); }
+  _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()); }
+  // _updateHazard = () => { this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); }
+  // render = () => { tracePoints(this._points(this.shape), true, this.color); }
 }
 
 class OldAsteroid extends GameObject { // TODO remove
@@ -432,7 +447,7 @@ class BigAsteroid extends Asteroid {
   constructor(game, loc) {
     super(game, loc, null, null, BIGROCK_R, null, null, 3);
   }
-  _onDestroyInBounds = () => { // spawn 2 asteroids in a 120 degree cone
+  _onDestroyHazard = () => { // spawn 2 asteroids in a 120 degree cone
     new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25));
     new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); 
     if (this.game.score > 25 && randomChoice([true, false])) { // 3rd can spawn after a specific score is reached
@@ -441,21 +456,35 @@ class BigAsteroid extends Asteroid {
   }
 }
 
-class Upgrade extends OldAsteroid { // TODO: add glow effect
+class Upgrade extends Hazard { // not really a hazard but the behavior is 90% the same
   constructor(game, loc) {
-    super(game, loc, null, HEXAGON, UPGRADE_V);
-    this.isUpgrade = true; // collision exception
-    this.shape = HEXAGON; // (re)assignment after super() keeps shape regular
-    this.color = '#0F0';
+    super(game, loc, UPGRADE_V, null, UPGRADE_R, HEXAGON, UPGRADE_C, 0);
+    this.isUpgrade = true; // flag so collision doesn't kill the player
   }
   _onDestroy = () => {
-    if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) {
-      this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // skip to highest level available
+    if (this.game.player.weapon.level < MAX_WEAPON_LVL) { // when hit, skips to the highest available level
+      this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1);
     }
     setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
   }
-  render = () => { tracePoints(this._points(this.shape), true, this.color); }
+  _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius() * 5)}
 }
+
+// class OldUpgrade extends OldAsteroid { // TODO: add glow effect
+//   constructor(game, loc) {
+//     super(game, loc, null, HEXAGON, UPGRADE_V);
+//     this.isUpgrade = true; // collision exception
+//     this.shape = HEXAGON; // (re)assignment after super() keeps shape regular
+//     this.color = '#0F0';
+//   }
+//   _onDestroy = () => {
+//     if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) {
+//       this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // skip to highest level available
+//     }
+//     setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
+//   }
+//   render = () => { tracePoints(this._points(this.shape), true, this.color); }
+// }
 
 class Comet extends Asteroid {
   constructor(game, loc) {
@@ -463,11 +492,11 @@ class Comet extends Asteroid {
     this._turnAmt = randomVal(-COMET_TA, COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
   }
-  _onDestroyInBounds = () => { this.value = 7; }
-  _updateHazard = () => {
+  _onDestroyHazard = () => { this.value = 7; }
+  _updateInBounds = () => {
     this.theta += this._turnAmt;
     this.vel.set(Math.cos(this.theta), Math.sin(this.theta), COMET_V);
-    this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
+    // this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
   }
 }
 
@@ -503,7 +532,7 @@ class UFO extends OldAsteroid {
   _onDestroy = () => { 
     if (!this.game.gameOver && this.inBounds()) {
       this.game.score+=8;
-      // new ImplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius(), 10, true);
+      // new ImplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius(), true);
     }
     clearTimeout(this._trigger); // ceasefire
   }
