@@ -377,7 +377,7 @@ class Asteroid extends GameObject {
     this.shape = shape.map((x) => x += randomChoice([1, -1]) * randomVal(0, 1 / shape.length)); // make it look rocky; TODO: refactor
     this.color = ROCK_C;
   }
-  _onDestroy = () => { this.game.score++ }
+  _onDestroy = () => { if (!this.game.gameOver) this.game.score++ }
   //   if (!this._destroyed) { // TODO: move this logic into GameObject
   //     this._destroyed = true;
   //     if (!this.game.gameOver) this.game.score++;
@@ -406,7 +406,7 @@ class BigAsteroid extends Asteroid {
     // if (!this._destroyed) {
       // this._destroyed = true;
       // if (!this.game.gameOver) this.game.score+=3
-      this.game.score+=3;
+      if (!this.game.gameOver) this.game.score+=3;
       if (this.inBounds()) {
         new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25)); // splits into 2 asteroids before destroying itself
         new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); // asteroids have same angle +/- 45-60 degrees (pi/6-pi/4 radians)
@@ -443,7 +443,7 @@ class Comet extends Asteroid {
     this._turnAmt = randomVal(-COMET_TA, COMET_TA);
     new ParticleTrailAnimation(game, this);
   }
-  _onDestroy = () => { this.game.score += this.inBounds ? 7 : 2; }
+  _onDestroy = () => { if (!this.game.gameOver) this.game.score += this.inBounds() ? 7 : 2; }
   //   if (!this._destroyed) {
   //     this._destroyed = true;
   //     if (!this.game.gameOver) this.game.score+=2;
@@ -494,7 +494,7 @@ class UFO extends Asteroid {
     //   this._destroyed = true;
     //   if (!this.game.gameOver && this.inBounds()) this.game.score+=10;
     // }
-    if (this.inBounds()) this.game.score+=8;
+    if (!this.game.gameOver && this.inBounds()) this.game.score+=8;
     clearTimeout(this._trigger); // ceasefire
   }
   fire = () => {
