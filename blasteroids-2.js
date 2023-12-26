@@ -8,7 +8,7 @@ const BUILD = '2023.12.25.1'; // makes it easier to check for cached version on 
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 const DTAP_TIMEOUT = 300;
 const LTAP_TIMEOUT = 500; // how long to wait for a long press
-const TILT_THRESH = 3; //0.55;
+const TILT_THRESH = 3;
 
 let lastOrientation = screen.orientation.type;
 if (MOBILE && DEBUG) alert(lastOrientation);
@@ -18,13 +18,12 @@ const FPS = 60
 const TIME_STEP = 1000 / FPS;
 const SHAPE_FILL = '#000';
 const LINE_COLOR = DEBUG ? '#0F0' : '#FFF';
-// const LINE_WIDTH = MOBILE ? 3 : 2;
 const FONT_SIZE = MOBILE ? 45 : 30;
 const FONT_FAM = 'monospace';
 const PADDING = 10;
 const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
-const PARALLAX = 0.3333 // ratio for parallax effect
+const PARALLAX = 0.3333                   // ratio for parallax effect
 
 // player
 const TRIANGLE = [(3 * Math.PI / 2), (Math.PI / 4), (3 * Math.PI / 4)];
@@ -32,7 +31,6 @@ const PLAYER_R = MOBILE ? 20 : 16;     // radius
 const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 const PLAYER_F = 0.02;                 // friction
-const T_OFFSET = 0 // Math.PI / 2;          // theta offset for player rotations; consequence of triangle pointing along y-axis
 const PLAYER_C = '#AAA'                // player (and player projectile) color
 
 // player weapon
@@ -54,9 +52,13 @@ const ROCK_R = PLAYER_R * 2; // radius
 const ROCK_V = 0.3;          // velocity
 const ROCK_C = '#FFF'        // color
 
+// big asteroid
+const BIGROCK_R = ROCK_R * 2
+
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
 const COMET_C = '#FD0';
+const COMET_R = ROCK_R * 0.7;
 const COMET_V = ROCK_V * 1.6;
 const COMET_TA = 0.009; // per-frame turn amount (radians)
 
@@ -122,9 +124,9 @@ getColorChannels = (color) => { // "#FFF" -> "FF", "FF", "FF" -> [256, 256, 256]
   let _b = parseInt(color[3]+color[3], 16);
   return [_r, _g, _b];
 }
-fadeColor = (color, alpha) => {
+fadeColor = (color, alpha, flicker=false) => {
   return '#' + getColorChannels(color).map(channel => Math.floor(alpha * channel).toString(16))
-                                      .map(channel => ('0' + channel).slice(-2)) // lpad to prevent flicker for low values
+                                      .map(channel => flicker ? channel : ('0' + channel).slice(-2)) // single-digit values overflow the final hex
                                       .reduce((a, b) => a + b);
 }
 
@@ -172,7 +174,7 @@ class GameObject {
     this.objId = this.game.register(this);
     this._radius = radius;
     this.theta = theta;
-    this.desroyed = false;
+    this.destroyed = false;
   }
   getRadius = () => { return getScale() * this._radius } // wrapper to rescale on landscape-mobile
   inBounds = () => { return -this.getRadius() <= this.loc.x && this.loc.x <= canvas.width+this.getRadius() 
@@ -318,7 +320,6 @@ class Player extends GameObject {
       if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
       resizeCanvas();                                 // adjust for new dims
       this.game.createBgStars();                      // stars need to be redrawn because of new dims
-      // this.loc = new Vector2(canvas.width*0.5, canvas.height*0.5); // reset location so not offscreen
       if (DEBUG) alert('x:'+canvas.width+' y:'+canvas.height);
     }
   }
@@ -329,7 +330,7 @@ class Player extends GameObject {
   _onDestroy = () => {
     this.game.gameOver = true;
     this.deregisterInputs();
-    new ExplosionAnimation(this.game, this.loc.copy(), this.color, 400*getScale(), 25);
+    new ExplosionAnimation(this.game, this.loc.copy(), this.color, 400*getScale());
   }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH}
   _safeUpdateVelocity = (v) => {
@@ -341,15 +342,15 @@ class Player extends GameObject {
   update = () => {
     // rotate towards target
     if (this.target) { 
-      this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x) + T_OFFSET;
+      this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
       setTimeout(() => this.target = null, 1000); // stay on target for 1s so shots land more consistently
     } else if (this._isTilted()) {
-      this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) + T_OFFSET;
+      this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
     }
     this.theta %= 2 * Math.PI; // radians
     // fire projectile
     if (this.firing) {
-      this.weapon.fire(this.game, this.loc.copy(), this.theta-T_OFFSET);
+      this.weapon.fire(this.game, this.loc.copy(), this.theta);
       this.firing = false;
       this.game.shots++;
     }
@@ -357,7 +358,7 @@ class Player extends GameObject {
     if (MOBILE && this._isTilted()) { // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
       this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * getScale()); // scale by 1/90 to normalize raw tilt input
     } 
-    if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta-T_OFFSET), Math.sin(this.theta-T_OFFSET), this.accel * this.game.deltaTime);
+    if (!MOBILE && this.boosting) this.vel.add(Math.cos(this.theta), Math.sin(this.theta), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, canvas.height));
@@ -366,23 +367,53 @@ class Player extends GameObject {
   render = () => { tracePoints(this._points(TRIANGLE_2), true, this.color, this.color); } // TODO: change color based on upgrade level
 }
 
-// TODO: hazard subclass
+class Hazard extends GameObject {
+  constructor(game, loc, vel, theta, radius, shape, color, value) {
+    super(game, loc, vel, radius, theta);
+    this.shape = shape;
+    this.color = color;
+    this.value = value;
+    this.isHazard = true; // collision filter
+  }
+  _onDestroyInBounds = () => {} // virtual, wraps subclass destruction logic
+  _onDestroyAnimation = () => {} // virtual, wraps subclass destruction animations
+  _onDestroy = () => { // TODO: move this into GameObject
+    if (this.inBounds()) {
+      this._onDestroyInBounds(); // called before score update so subclass can change its value if conditions are met
+      this._onDestroyAnimation();
+    } 
+    if (!this.game.gameOver) { this.game.score += this.value; }
+  }
+  _updateHazard = () => {} // virtual, wraps update()
+  update = () => { if (this.inBounds()) { this._updateHazard(); } else { this.destroy(); } }
+}
 
-class Asteroid extends GameObject {
+class Asteroid extends Hazard {
+  constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
+    theta = theta || Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
+    vscale = vscale || ROCK_V;
+    radius = radius || ROCK_R;
+    shape = shape || OCTAGON;
+    color = color || ROCK_C;
+    value = value || 1;
+    super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), vscale), theta, radius, shape, color, value);
+    this.shape = this.shape.map(x => x += randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
+  }
+  _onDestroyAnimation = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()) }
+  _updateHazard = () => { this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); }
+  render = () => { tracePoints(this._points(this.shape), true, this.color); }
+}
+
+class OldAsteroid extends GameObject { // TODO remove
   constructor(game, loc, theta=null, shape=OCTAGON, vScale=ROCK_V) {
     theta = theta ? theta % (2 * Math.PI) : Math.atan2(game.player.loc.y-loc.y, game.player.loc.x-loc.x);
     super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), vScale), ROCK_R, theta);
-    this._destroyed = false;
-    this.isAsteroid = true; // collision detection
+    // this._destroyed = false;
+    this.isHazard = true; // collision detection
     this.shape = shape.map((x) => x += randomChoice([1, -1]) * randomVal(0, 1 / shape.length)); // make it look rocky; TODO: refactor
     this.color = ROCK_C;
   }
   _onDestroy = () => { if (!this.game.gameOver) this.game.score++ }
-  //   if (!this._destroyed) { // TODO: move this logic into GameObject
-  //     this._destroyed = true;
-  //     if (!this.game.gameOver) this.game.score++;
-  //   }
-  // }
   update = () => {
     if (this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
@@ -399,24 +430,18 @@ class Asteroid extends GameObject {
 
 class BigAsteroid extends Asteroid {
   constructor(game, loc) {
-    super(game, loc);
-    this._radius *= 2;
+    super(game, loc, null, null, BIGROCK_R, null, null, 3);
   }
-  _onDestroy = () => { // spawn 2-3 asteroids in; 3rd can only spawn after a warm-up period (e.g., score > 10)
-    // if (!this._destroyed) {
-      // this._destroyed = true;
-      // if (!this.game.gameOver) this.game.score+=3
-      if (!this.game.gameOver) this.game.score+=3;
-      if (this.inBounds()) {
-        new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25)); // splits into 2 asteroids before destroying itself
-        new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); // asteroids have same angle +/- 45-60 degrees (pi/6-pi/4 radians)
-        if (this.game.score > 25 && randomChoice([true, false])) new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(-0.1667, 0.1667));
-      }
-    // }
+  _onDestroyInBounds = () => { // spawn 2 asteroids in a 120 degree cone
+    new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25));
+    new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * randomVal(0.1667, 0.25)); 
+    if (this.game.score > 25 && randomChoice([true, false])) { // 3rd can spawn after a specific score is reached
+      new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(-0.1667, 0.1667));
+    }
   }
 }
 
-class Upgrade extends Asteroid { // TODO: add glow effect
+class Upgrade extends OldAsteroid { // TODO: add glow effect
   constructor(game, loc) {
     super(game, loc, null, HEXAGON, UPGRADE_V);
     this.isUpgrade = true; // collision exception
@@ -424,47 +449,33 @@ class Upgrade extends Asteroid { // TODO: add glow effect
     this.color = '#0F0';
   }
   _onDestroy = () => {
-    // if (!this._destroyed) {
-      // this._destroyed = true;
-      if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) {
-        this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // skip to highest level available
-      }
-      setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
-    // }
+    if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) {
+      this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // skip to highest level available
+    }
+    setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
   }
   render = () => { tracePoints(this._points(this.shape), true, this.color); }
 }
 
 class Comet extends Asteroid {
   constructor(game, loc) {
-    super(game, loc, null, PENTAGON, COMET_V);
-    this.color = COMET_C;
-    this._radius *= 0.7;
-    this._turnAmt = randomVal(-COMET_TA, COMET_TA);
+    super(game, loc, null, COMET_V, COMET_R, PENTAGON, COMET_C, 2); //, null, null, PENTAGON, COMET_V, 2);
+    this._turnAmt = randomVal(-COMET_TA, COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
   }
-  _onDestroy = () => { if (!this.game.gameOver) this.game.score += this.inBounds() ? 7 : 2; }
-  //   if (!this._destroyed) {
-  //     this._destroyed = true;
-  //     if (!this.game.gameOver) this.game.score+=2;
-  //   }
-  // }
-  update = () => {
+  _onDestroyInBounds = () => { this.value = 7; }
+  _updateHazard = () => {
     this.theta += this._turnAmt;
     this.vel.set(Math.cos(this.theta), Math.sin(this.theta), COMET_V);
-    if (this.inBounds()) {
-      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale()); // scaled negative to move inward on spawn
-    } else {
-      this.destroy();
-    }
+    this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * getScale());
   }
 }
 
 class EnemyProjectile extends GameObject {
   constructor(game, loc, theta) { 
     super(game, loc, new Vector2(Math.cos(theta), Math.sin(theta), PROJ_V), theta);
-    this.isAsteroid = true; // not exactly true but provides collision behavior
-    this._radius = PLAYER_R; // again not exactly true but collisions
+    this.isHazard = true;
+    this._radius = PLAYER_R; // not exactly true but the math works out
   }
   update = () => {
     if (this.inBounds()) {
@@ -476,7 +487,7 @@ class EnemyProjectile extends GameObject {
   render = () => { tracePoints([this.loc, new Vector2(this.loc.x-this.vel.x*PROJ_L, this.loc.y-this.vel.y*PROJ_L)], false, '#F00') }
 }
 
-class UFO extends Asteroid {
+class UFO extends OldAsteroid {
   constructor(game, loc) {
     super(game, loc);
     this.color = UFO_C;
@@ -490,11 +501,10 @@ class UFO extends Asteroid {
   _getActiveState = () => { return !this.game.gameOver && this._chaseFrames < this._chaseLimit }
   _getFireRate = () => { return Math.max(500, 1500-this.game.score) }; // fire every 0.5-1.5s, depending on score
   _onDestroy = () => { 
-    // if (!this._destroyed) {
-    //   this._destroyed = true;
-    //   if (!this.game.gameOver && this.inBounds()) this.game.score+=10;
-    // }
-    if (!this.game.gameOver && this.inBounds()) this.game.score+=8;
+    if (!this.game.gameOver && this.inBounds()) {
+      this.game.score+=8;
+      // new ImplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius(), 10, true);
+    }
     clearTimeout(this._trigger); // ceasefire
   }
   fire = () => {
@@ -528,7 +538,7 @@ class UFO extends Asteroid {
 // }
 
 class ExplosionAnimation extends GameObject {
-  constructor(game, loc, color=LINE_COLOR, maxRadius, waveDensity=5) {
+  constructor(game, loc, color=LINE_COLOR, maxRadius, flicker=false) {
     super(game, loc, null, (maxRadius * 0.5));
     this.color = color;
     this.baseColor = color;
@@ -536,7 +546,8 @@ class ExplosionAnimation extends GameObject {
     this.maxFrames = FPS * 0.5; // complete in ~1/2s
     this.currentFrame = 0;
     this.waves = [];
-    this.waveDensity = waveDensity;
+    this.waveDensity = 5;
+    this.flicker = flicker;
   }
   _points = (shape, radius) => { 
     var points = [];
@@ -555,67 +566,41 @@ class ExplosionAnimation extends GameObject {
         while (shape.length < this.waveDensity) { shape.push(randomVal(0, Math.PI * 2)); }
         this.waves.push(shape); // make a new wave at the center
       }
-      this.color = fadeColor(this.baseColor, (1 - (this.currentFrame / this.maxFrames)**2));
+      this.color = fadeColor(this.baseColor, (1 - (this.currentFrame / this.maxFrames)**2), this.flicker);
       this.currentFrame++;
     }
   }
   render = () => {
     for (let i = 0; i < this.waves.length; i++) {
-      // let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius; // ALT: treats all waves the same and makes a (cool) impact ring
       let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius + (this.waves.length - i);
       dotPoints(this._points(this.waves[i], waveRadius), this.color);
     }
   }
 }
 
-// class ImplosionAnimation extends GameObject {
-//   constructor(game, loc, color, theta, maxRadius) {
-//     super(game, loc, null, 10, theta);
-//     this.color = color;
-//     this.maxRadius = maxRadius;
-//     this.maxFrames = FPS/2; // complete in 1/2s
-//     this.currentFrame = 0;
-//     this.waves = [];
-//   }
+class FlickerExplosionAnimation extends ExplosionAnimation {
+  constructor(game, loc, color=LINE_COLOR, maxRadius) {
+    super(game, loc, color, maxRadius, true);
+  }
+}
 
-//   _points = (shape, radius) => { 
-//     var points = [];
-//     shape.forEach(point => {
-//       var x = this.loc.x + radius * Math.cos(point);
-//       var y = this.loc.y + radius * Math.sin(point);
-//       points.push(new Vector2(x, y));
-//     });
-//     return points;
-//   }
+class ImplosionAnimation extends ExplosionAnimation {
+  render = () => {
+    for (let i = 0; i < this.waves.length; i++) {
+      let waveRadius = ((this.maxFrames - i) / this.maxFrames) * this.maxRadius;
+      dotPoints(this._points(this.waves[i], waveRadius), this.color);
+    }
+  }
+}
 
-//   update = () => {
-//     if (this.currentFrame > this.maxFrames) this.destroy();
-//     else {
-//       let shape = [];
-//       while (shape.length < 10) {
-//         let _theta = randomVal(this.theta, (Math.PI * 2) + this.theta);
-//         shape.push(_theta);
-//       }
-//       this.waves.push(shape); // make a new wave at the center
-//       let subHex = Math.floor((1 - (this.currentFrame / this.maxFrames)**2) * 255).toString(16); // fade to black
-//       if (subHex.length < 2) subHex = '0' + subHex; // low values don't lpad which skews the final hex and creates a flicker
-//       this.color = '#' + subHex + subHex + subHex;
-//       // console.log(this.color);
-//       this.currentFrame++;
-//       // // let temp = Math.floor((1 - (this.currentFrame / this.maxFrames)) * 255).toString(16); // gradually fade to black
-//       // // this.color = '#' + temp + temp + temp;
-//       // // ^ doesn't work as intended but has a cool flicker at the end I want to use later
-//     }
-//   }
-//   render = () => {
-//     // this.waves.forEach((waveShape) => { tracePoints(this._points(waveShape), true, this.color) });
-//     for (let i = 0; i < this.waves.length; i++) {
-//       let waveRadius = ((this.maxFrames - i) / this.maxFrames) * this.maxRadius;
-//       dotPoints(this._points(this.waves[i], waveRadius), this.color);
-//       // tracePoints(this._points(this.waves[i], waveRadius), false, this.color);
-//     }
-//   }
-// }
+class ImpactRingAnimation extends ExplosionAnimation {
+  render = () => {
+    for (let i = 0; i < this.waves.length; i++) {
+      let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius;
+      dotPoints(this._points(this.waves[i], waveRadius), this.color);
+    }
+  }
+}
 
 class ParticleTrailAnimation extends GameObject {
   constructor(game, source, maxWaves=16, canGenerate=null) {
@@ -677,10 +662,8 @@ class Game {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
     } else if (this.paused) { // recalibrate
-        this.player.neutral = null; // neutral pos will reset on resume
-        if (DEBUG) alert('gyroscope will reset on resume');
-        // this.handlePause(); // immediately unpause to get new neutral pos
-      // if (this.gameOver) this.newGame(); // restart
+      this.player.neutral = null; // neutral pos will reset on resume
+      if (DEBUG) alert('gyroscope will reset on resume');
     }
   }
   _handleTouchEnd = (event) => { // long press
@@ -749,15 +732,6 @@ class Game {
   }
   spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing  timer
     if (!this.gameOver) {
-      // let x = null;
-      // let y = null;
-      // if (randomChoice([true, false])) { 
-      //   x = randomChoice([0, canvas.width]);
-      //   y = randomVal(0, canvas.height);
-      // } else {
-      //   x = randomVal(0, canvas.width);
-      //   y = randomChoice([0, canvas.height]);
-      // }
       let spawnClass = null;
       if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
         spawnClass = Upgrade;
@@ -785,10 +759,10 @@ class Game {
   checkAsteroidCollision = (collisionObj) => {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
-      if ('isAsteroid' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
+      if ('isHazard' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
-        new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.getRadius());
+        // new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.getRadius());
         return true;
       }
     }
