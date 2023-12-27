@@ -2,7 +2,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.26.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2023.12.27.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -584,6 +584,8 @@ class ParticleTrailAnimation extends GameObject {
 
 class Game {
   constructor() {
+    // flag for start screen on first arrival
+    this.new = true;
     // timer
     this.lastTick = 0; // last time run() was executed
     this.deltaTime = 0;
@@ -636,16 +638,18 @@ class Game {
         'BLASTEROIDS',
         (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-        (MOBILE ? 'HOLD' : 'ESC') + ' TO RESUME',
-        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY', 'YOURS TRULY,',
-                                      'MERRY CHRISTMAS', 'HAPPY HOLIDAYS'])
+        (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'RESUME'),
+        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY',
+                                      'HAPPY NEW YEAR', 'HAPPY HOLIDAYS'])
       ]
       // if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO SET GYRO');
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      this.lastTick += (Date.now() - this.pauseTime);
-      this.spawnAsteroid();
+      this.new = false;
+      let timeDiff = (Date.now() - this.pauseTime);
+      this.lastTick += timeDiff;
+      this.asteroidTimer = setTimeout(this.spawnAsteroid, Math.max(0, this.timeToImpact-timeDiff));
       this.frameReq = requestAnimationFrame(this.run);
     }
   }
@@ -664,24 +668,28 @@ class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = DEBUG ? 300 : 0;
+    this.score = 0;
     this.shots = 0;
     this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
-    this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
     this.upgradeInPlay = false;
     this.createBgStars();
+    if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
+    else { this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact); }
   }
   createBgStars = () => {
     this.bgStars = [];
-    for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width*2), randomVal(-canvas.height, canvas.height*2))); }
+    for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width*2),
+                                                                   randomVal(-canvas.height, canvas.height*2))); }
   }
-  spawnAsteroid = (size=0, chain=true) => { // spawns a new asteroid then queues the next one on a decreasing  timer
+  spawnAsteroid = () => { // spawns a new asteroid then queues the next one on a decreasing  timer
     if (!this.gameOver) {
+      if (DEBUG) console.log('spawning asteroid');
       let spawnClass = null;
-      if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
+      if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL 
+          && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
         spawnClass = Upgrade;
         this.upgradeInPlay = true;
       } else if (this.score > 300) {
@@ -700,8 +708,8 @@ class Game {
         spawnClass = Asteroid;
       }
       new spawnClass(this, randomSpawn()); // new Vector2(x, y));
-      if (this.timeToImpact > (DEBUG ? 5000 : 1000)) this.timeToImpact -= 25;
-      if (chain) this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact, (this.score > 3 ? randomChoice([0, 1]) : 0));
+      if (this.timeToImpact > (DEBUG ? 5000 : 1000)) { this.timeToImpact -= 25; }
+      this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
     }
   }
   checkAsteroidCollision = (collisionObj) => {
@@ -717,11 +725,12 @@ class Game {
     return false;
   }
   createGameOverText = () => {
-    let sharpshooter = (this.shots > 25 && this.hits >= this.shots * 0.9);
+    let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.7);
     let pacifist = (this.shots === 0);
     // D rank
     let rank = 'D';
-    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU', 'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
+    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU',
+                       'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
     if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
     // C rank
     if (sharpshooter && this.score >= 25) {
@@ -730,7 +739,8 @@ class Game {
     }
     if (this.score >= 50) {
       rank = 'C';
-      commentPool = pacifist ? ['NAILED IT', 'PHONE HOME'] : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
+      commentPool = pacifist ? ['NAILED IT', 'PHONE HOME'] 
+                             : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 75) {
@@ -739,18 +749,21 @@ class Game {
     }
     if (this.score >= 100) {
       rank = 'B';
-      commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND'] : ['GOOD HUSTLE', 'VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
+      commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND', 'NAMASTE'] 
+                             : ['GOOD HUSTLE', 'VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
+    // A (S) rank
     if (sharpshooter && this.score >= 200) {
       rank = 'A'; 
-      commentPool = ['HOT SHOT', 'EAGLE EYE'];
+      commentPool = ['HOT SHOT', 'EAGLE EYE', 'JARATE'];
     }
     if (this.score >= 250) {
       rank = 'A';
       commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 400) {
         rank = 'S';
-        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE'] : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'A WINNER IS YOU', 'RAW'];
+        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] 
+                               : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'A WINNER IS YOU', 'RAW'];
       }
     }
     this.gameOverText = [
@@ -764,8 +777,8 @@ class Game {
     ]
   }
   update = () => { 
-    this.gameObjects.forEach((gameObj) => { gameObj.update() });
-    if (this.gameOver) clearTimeout(this.asteroidTimer);
+    if (!this.paused) { this.gameObjects.forEach((gameObj) => { gameObj.update() }); }
+    if (this.gameOver) { clearTimeout(this.asteroidTimer); }
   }
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
@@ -782,8 +795,8 @@ class Game {
       dotPoints(this.bgStars);
     }
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    let padding = PADDING * getScale()
-    let fontSize = FONT_SIZE * getScale()
+    let padding = PADDING * getScale() * (MOBILE ? 5 : 1);
+    let fontSize = FONT_SIZE * getScale();
     displayText(this.score, padding, padding + fontSize);
     if (this.gameOver){
       if (!this.gameOverText) this.createGameOverText();
