@@ -646,11 +646,13 @@ class Game {
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      this.new = false;
+      
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
-      this.asteroidTimer = setTimeout(this.spawnAsteroid, Math.max(0, this.timeToImpact-timeDiff));
+      if (this.new) { this.asteroidTimer = setTimeout(this.spawnAsteroid, Math.max(0, this.timeToImpact-timeDiff)); }
+      else { this.spawnAsteroid(); }
       this.frameReq = requestAnimationFrame(this.run);
+      this.new = false;
     }
   }
   register = (gameObj) => {
