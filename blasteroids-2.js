@@ -39,6 +39,7 @@ const PLAYER_C = '#AAA'                // player (and player projectile) color
 // player weapon
 const MAX_WEAPON_LVL = 4;
 const OFFSET_RATIO = PLAYER_R * 0.35; // it just works
+const WEAPON_SFX = document.getElementById('weaponSfx');
 
 // projectile
 const PROJ_V = 1;  // velocity
@@ -255,6 +256,8 @@ class PlayerWeapon {
       default:
         new Projectile(game, loc, theta);
     }
+    WEAPON_SFX.load(); // https://stackoverflow.com/a/73774617/3178898
+    WEAPON_SFX.play();
    }
 }
 
