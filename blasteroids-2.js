@@ -1,3 +1,6 @@
+// Blasteroids by whitgroves
+// Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, JavierZumer, and viewers like you
+
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
