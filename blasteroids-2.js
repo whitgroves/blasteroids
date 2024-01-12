@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2023.12.28.1'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.12.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -256,9 +256,11 @@ class PlayerWeapon {
       default:
         new Projectile(game, loc, theta);
     }
-    WEAPON_SFX.load(); // https://stackoverflow.com/a/73774617/3178898
-    WEAPON_SFX.play();
-   }
+    if (WEAPON_SFX) {
+      WEAPON_SFX.load(); // https://stackoverflow.com/a/73774617/3178898
+      WEAPON_SFX.play(); 
+    }
+  }
 }
 
 class Player extends GameObject {
@@ -397,7 +399,7 @@ class Hazard extends GameObject {
     this._onDestroyHazard(); // called before score update so subclass can change its value if conditions are met
     if (!this.game.gameOver) { this.game.score += this.value; }
   }
-  render = () => { tracePoints(this._points(this.shape), this.shape, this.color); } // null shape => no fill
+  render = () => { tracePoints(this._points(this.shape), this.shape, this.color); } // using this.shape as enclose flag
 }
 
 class Asteroid extends Hazard {
@@ -431,14 +433,23 @@ class Upgrade extends Hazard { // not really a hazard but behavior is 90% the sa
   constructor(game, loc) {
     super(game, loc, UPGRADE_V, null, UPGRADE_R, HEXAGON, UPGRADE_C, 0);
     this.isUpgrade = true; // flag so collision doesn't kill the player
+    this.glowFrames = FPS*2;
+    this.colorGradient = Array.from({length: this.glowFrames}, (c, i) => fadeColor(this.color, 1-(i/this.glowFrames)));
+    this.gradientIndex = 0;
+    this.gradientStep = -1; // will flip on first call to `render()`
   }
   _onDestroy = () => {
-    if (this.game.player.weapon.level < MAX_WEAPON_LVL) { // when hit, skips to the highest available level
-      this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1);
+    if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) { // skip to the highest available level
+      this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // * 1/75
     }
     setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
   }
   _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius() * 5)}
+  render = () => {
+    tracePoints(this._points(this.shape), this.shape, this.color, this.colorGradient[this.gradientIndex]);
+    if (this.gradientIndex <= 0 || this.gradientIndex >= this.colorGradient.length) { this.gradientStep *= -1; }
+    this.gradientIndex += this.gradientStep;
+  }
 }
 
 class Comet extends Asteroid {
@@ -563,7 +574,7 @@ class ParticleTrailAnimation extends GameObject {
     this.waves = [];
     this.density = density || 5;
     this.maxWaves = maxWaves || 16;
-    this.colorGradient = Array.from({length: this.maxWaves}, (c, i) => fadeColor(source.color, (1-(i/this.maxWaves))));
+    this.colorGradient = Array.from({length: this.maxWaves}, (c, i) => fadeColor(source.color, 1-(i/this.maxWaves)));
     this.canGenerate = canGenerate ? canGenerate : () => { return true }; // responsiveness
   }
   update = () => {
@@ -676,7 +687,7 @@ class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = 0;
+    this.score = DEBUG ? 75 : 0;
     this.shots = 0;
     this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
