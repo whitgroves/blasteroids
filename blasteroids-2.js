@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.14.3'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -86,6 +86,9 @@ const UFO_R = PLAYER_R * 1.5;
 const UFO_V = ROCK_V * 0.8;
 const UFO_C = '#F00';
 // const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
+const UFO_SFX_0 = document.getElementById('ufoSfx_0');
+const UFO_SFX_1 = document.getElementById('ufoSfx_1');
+UFO_SFX_1.volume = .5;
 
 // display
 getScale = () => { return !MOBILE ? 1 : lastOrientation == 'portrait-primary' ? 0.8 : 0.35 }
@@ -151,6 +154,7 @@ fadeColor = (color, alpha) => {
 // sfx
 safePlayAudio = (audio) => {
   if (audio) { // make sure file is actually loaded first
+    audio.muted = false; // ...and that it's not muted
     audio.pause(); // https://stackoverflow.com/q/14834520
     audio.currentTime = 0;
     audio.play();
@@ -487,7 +491,10 @@ class Comet extends Asteroid {
     safePlayAudio(COMET_SFX_0);
   }
   _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*3); }
-  _onDestroyAudio = () => { safePlayAudio(COMET_SFX_1); }
+  _onDestroyAudio = () => {
+    COMET_SFX_0.muted = true; // force whoosh sound to stop
+    safePlayAudio(COMET_SFX_1);
+  }
   _onDestroyHazard = () => { if (this.inBounds()) { this.value = 7; } }
   _onUpdate = () => {
     this.theta += this._turnAmt;
@@ -504,6 +511,7 @@ class EnemyProjectile extends Hazard {
 
 class UFO extends Hazard {
   constructor(game, loc) {
+    safePlayAudio(UFO_SFX_0);
     super(game, loc, UFO_V, null, UFO_R, TRIANGLE, UFO_C, 0);
     this._chaseFrames = 0;
     this._chaseLimit = Math.max(3000, 5000-game.timeToImpact); // longer games => longer chases
@@ -514,6 +522,7 @@ class UFO extends Hazard {
   _getFireRate = () => { return Math.max(500, 1500-this.game.score) }; // increase fire rate as score increases
   _fire = () => {
     if (this._getActiveState()) {
+      safePlayAudio(UFO_SFX_1);
       new EnemyProjectile(this.game, this.loc, this.theta);
       this._trigger = setTimeout(this._fire, this._getFireRate());
     }
@@ -521,6 +530,7 @@ class UFO extends Hazard {
   _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius()*5); }
   _onDestroyHazard = () => {
     clearTimeout(this._trigger); // ceasefire
+    UFO_SFX_0.muted = true; // stop engine noise until next UFO spawns
     if (this.inBounds()) { this.value = 8; }
     else if (!this.game.gameOver) { // if it makes it safely out of bounds, spawn back in with the next hazard
       setTimeout(() => { new UFO(this.game, randomSpawn()); }, this.game.timeToImpact);
@@ -715,7 +725,7 @@ class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = DEBUG ? 75 : 0;
+    this.score = DEBUG ? 300 : 0;
     this.shots = 0;
     this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
