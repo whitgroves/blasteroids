@@ -10,7 +10,16 @@
     </style>
   </head>
   <body>
-    <audio id="weaponSfx" src="./retro-shot-blaster.wav"></audio> <!-- run as server to fix CORS error -->
+    <!-- on a local setup these files will fail to load because HTML treats
+         them as an anonymous, thus triggering a CORS error. the workaround
+         for local audio is running a python server via `py -m http.server` -->
+    <audio id="weaponSfx" src="./257232__javierzumer__retro-shot-blaster.wav"></audio>
+    <audio id="boomSfx_0" src="./386862__profmudkip__8-bit-explosion.wav"></audio>
+    <audio id="boomSfx_1" src="./259962__thehorriblejoke__8-bit-explosion.wav"></audio>
+    <audio id="upgradeSfx_0" src="./609335__kenneth_cooney__levelup.wav"></audio>
+    <audio id="upgradeSfx_1" src="./211741__taira-komori__jump01.mp3"></audio>
+    <!-- <audio id="" src=""></audio> -->
+
     <canvas id="mainCanvas" width="400" height="400"></canvas>
     <script id="debugFlag" type="application/json"> { "isDebug" : true } </script>
     <script src="blasteroids-2.js"></script>

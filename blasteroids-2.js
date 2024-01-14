@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.14.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.14.2'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -48,9 +48,9 @@ const PROJ_L = 10; // length
 
 // hazard
 const BOOM_SFX_0 = document.getElementById('boomSfx_0');
-BOOM_SFX_0.volume = 0.25;
+BOOM_SFX_0.volume = 0.2;
 const BOOM_SFX_1 = document.getElementById('boomSfx_1');
-BOOM_SFX_1.volume = 0.25;
+BOOM_SFX_1.volume = 0.2;
 
 // asteroid 
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
@@ -66,6 +66,9 @@ const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI /
 const UPGRADE_R = PLAYER_R * 2.5
 const UPGRADE_V = 0.2;
 const UPGRADE_C = '#0F0';
+const UPGRADE_SFX_0 = document.getElementById('upgradeSfx_0');
+const UPGRADE_SFX_1 = document.getElementById('upgradeSfx_1');
+UPGRADE_SFX_1.volume = .2;
 
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
@@ -143,11 +146,10 @@ fadeColor = (color, alpha) => {
 
 // sfx
 safePlayAudio = (audio) => {
-  try { // sometimes the files don't load, sometimes they're played too quickly in succession
-    audio.load(); // https://stackoverflow.com/a/73774617/3178898
+  if (audio) { // make sure file is actually loaded first
+    audio.pause(); // https://stackoverflow.com/q/14834520
+    audio.currentTime = 0;
     audio.play();
-  } catch (e) {
-    console.log(e);
   }
 }
 
@@ -450,6 +452,7 @@ class BigAsteroid extends Asteroid {
 
 class Upgrade extends Hazard { // not really a hazard but behavior is 90% the same
   constructor(game, loc) {
+    safePlayAudio(UPGRADE_SFX_1);
     super(game, loc, UPGRADE_V, null, UPGRADE_R, HEXAGON, UPGRADE_C, 0);
     this.isUpgrade = true; // flag so collision doesn't kill the player
     this.glowFrames = FPS*2;
@@ -460,6 +463,7 @@ class Upgrade extends Hazard { // not really a hazard but behavior is 90% the sa
   _onDestroy = () => {
     if (this.inBounds() && this.game.player.weapon.level < MAX_WEAPON_LVL) { // skip to the highest available level
       this.game.player.weapon.level = Math.min(MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // * 1/75
+      safePlayAudio(UPGRADE_SFX_0);
     }
     setTimeout(() => { this.game.upgradeInPlay = false }, randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
   }
@@ -684,8 +688,8 @@ class Game {
       
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
-      if (this.new) { this.asteroidTimer = setTimeout(this.spawnAsteroid, Math.max(0, this.timeToImpact-timeDiff)); }
-      else { this.spawnAsteroid(); }
+      if (this.new) { this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff)); }
+      else { this.spawnHazard(); }
       this.frameReq = requestAnimationFrame(this.run);
       this.new = false;
     }
@@ -714,16 +718,16 @@ class Game {
     this.upgradeInPlay = false;
     this.createBgStars();
     if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
-    else { this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact); }
+    else { this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact); }
   }
   createBgStars = () => {
     this.bgStars = [];
     for (let i = 0; i < 1000; i++) { this.bgStars.push(new Vector2(randomVal(-canvas.width, canvas.width*2),
                                                                    randomVal(-canvas.height, canvas.height*2))); }
   }
-  spawnAsteroid = () => { // spawns a new asteroid then queues the next one on a decreasing  timer
+  spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
     if (!this.gameOver) {
-      if (DEBUG) console.log('spawning asteroid');
+      if (DEBUG) console.log('spawning hazard');
       let spawnClass = null;
       if (!this.upgradeInPlay && this.player.weapon.level < MAX_WEAPON_LVL 
           && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
@@ -746,7 +750,7 @@ class Game {
       }
       new spawnClass(this, randomSpawn()); // new Vector2(x, y));
       if (this.timeToImpact > (DEBUG ? 5000 : 1000)) { this.timeToImpact -= 25; }
-      this.asteroidTimer = setTimeout(this.spawnAsteroid, this.timeToImpact);
+      this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
   checkAsteroidCollision = (collisionObj) => {
