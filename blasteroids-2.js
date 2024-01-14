@@ -1,11 +1,11 @@
 // Blasteroids by whitgroves
-// Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, JavierZumer, and viewers like you
+// Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, freesound.org, and viewers like you
 
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.12.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.14.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -40,16 +40,17 @@ const PLAYER_C = '#AAA'                // player (and player projectile) color
 const MAX_WEAPON_LVL = 4;
 const OFFSET_RATIO = PLAYER_R * 0.35; // it just works
 const WEAPON_SFX = document.getElementById('weaponSfx');
+WEAPON_SFX.volume = 0.25; // base audio is relatively loud
 
 // projectile
 const PROJ_V = 1;  // velocity
 const PROJ_L = 10; // length
 
-// upgrade
-const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI / 6), (3 * Math.PI / 2), (11 * Math.PI / 6)];
-const UPGRADE_R = PLAYER_R * 2.5
-const UPGRADE_V = 0.2;
-const UPGRADE_C = '#0F0';
+// hazard
+const BOOM_SFX_0 = document.getElementById('boomSfx_0');
+BOOM_SFX_0.volume = 0.25;
+const BOOM_SFX_1 = document.getElementById('boomSfx_1');
+BOOM_SFX_1.volume = 0.25;
 
 // asteroid 
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
@@ -59,6 +60,12 @@ const ROCK_C = '#FFF'
 
 // big asteroid
 const BIGROCK_R = ROCK_R * 2
+
+// upgrade
+const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI / 6), (3 * Math.PI / 2), (11 * Math.PI / 6)];
+const UPGRADE_R = PLAYER_R * 2.5
+const UPGRADE_V = 0.2;
+const UPGRADE_C = '#0F0';
 
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
@@ -132,6 +139,16 @@ fadeColor = (color, alpha) => {
   return '#' + getColorChannels(color).map(channel => Math.floor(alpha * channel).toString(16))
                                       .map(channel => ('0' + channel).slice(-2)) // single-digit values overflow the final hex
                                       .reduce((a, b) => a + b);
+}
+
+// sfx
+safePlayAudio = (audio) => {
+  try { // sometimes the files don't load, sometimes they're played too quickly in succession
+    audio.load(); // https://stackoverflow.com/a/73774617/3178898
+    audio.play();
+  } catch (e) {
+    console.log(e);
+  }
 }
 
 // rng
@@ -256,10 +273,7 @@ class PlayerWeapon {
       default:
         new Projectile(game, loc, theta);
     }
-    if (WEAPON_SFX) {
-      WEAPON_SFX.load(); // https://stackoverflow.com/a/73774617/3178898
-      WEAPON_SFX.play(); 
-    }
+    safePlayAudio(WEAPON_SFX);
   }
 }
 
@@ -394,10 +408,14 @@ class Hazard extends GameObject {
     this.isHazard = true; // collision filter
   }
   _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()); } // default
+  _onDestroyAudio = () => { safePlayAudio(BOOM_SFX_0); } // default
   _onDestroyHazard = () => {} // virtual, re-wraps destruction logic
   _onDestroy = () => {
     this._onDestroyHazard(); // called before score update so subclass can change its value if conditions are met
-    if (!this.game.gameOver) { this.game.score += this.value; }
+    if (!this.game.gameOver) {
+      this.game.score += this.value;
+      if (this.inBounds()) this._onDestroyAudio();
+    }
   }
   render = () => { tracePoints(this._points(this.shape), this.shape, this.color); } // using this.shape as enclose flag
 }
@@ -418,6 +436,7 @@ class BigAsteroid extends Asteroid {
   constructor(game, loc) {
     super(game, loc, null, null, BIGROCK_R, null, null, 3);
   }
+  _onDestroyAudio = () => { safePlayAudio(BOOM_SFX_1); }
   _onDestroyHazard = () => { // spawn 2 asteroids in a 120 degree cone
     if (this.inBounds()) {
       new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * randomVal(0.1667, 0.25));
@@ -656,8 +675,7 @@ class Game {
         (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
         (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
         (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'RESUME'),
-        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY',
-                                      'HAPPY NEW YEAR', 'HAPPY HOLIDAYS'])
+        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY'])
       ]
       // if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO SET GYRO');
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
