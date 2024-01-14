@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.0'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.1'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -27,6 +27,10 @@ const PADDING = 10;
 const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
 const PARALLAX = 0.3333                   // ratio for parallax effect
+const PAUSE_SFX = document.getElementById('pauseSfx');
+PAUSE_SFX.volume = .4;
+const TITLE_BGM = document.getElementById('titleBgm');
+TITLE_BGM.volume = .4;
 
 // player
 const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
@@ -73,19 +77,19 @@ UPGRADE_SFX_1.volume = .2;
 // comet
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
 const COMET_C = '#FD0';
-const COMET_R = ROCK_R * 0.7;
-const COMET_V = ROCK_V * 1.7;
-const COMET_TA = 0.009; // per-frame turn amount (radians)
+const COMET_R = ROCK_R * 0.5;
+const COMET_V = ROCK_V * 2;
+const COMET_TA = 0.012; // per-frame turn amount (radians)
 const COMET_SFX_0 = document.getElementById('cometSfx_0');
 COMET_SFX_0.volume = .5;
 const COMET_SFX_1 = document.getElementById('cometSfx_1');
-COMET_SFX_1.volume = .2;
+COMET_SFX_1.volume = .3;
 
 // ufo
 const UFO_R = PLAYER_R * 1.5;
-const UFO_V = ROCK_V * 0.8;
+const UFO_V = ROCK_V * 0.67;
 const UFO_C = '#F00';
-// const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
+const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
 const UFO_SFX_0 = document.getElementById('ufoSfx_0');
 const UFO_SFX_1 = document.getElementById('ufoSfx_1');
 UFO_SFX_1.volume = .5;
@@ -490,7 +494,7 @@ class Comet extends Asteroid {
     new ParticleTrailAnimation(game, this);
     safePlayAudio(COMET_SFX_0);
   }
-  _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*3); }
+  _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*7); }
   _onDestroyAudio = () => {
     COMET_SFX_0.muted = true; // force whoosh sound to stop
     safePlayAudio(COMET_SFX_1);
@@ -512,18 +516,24 @@ class EnemyProjectile extends Hazard {
 class UFO extends Hazard {
   constructor(game, loc) {
     safePlayAudio(UFO_SFX_0);
-    super(game, loc, UFO_V, null, UFO_R, TRIANGLE, UFO_C, 0);
+    super(game, loc, UFO_V, null, UFO_R, DIAMOND, UFO_C, 0);
     this._chaseFrames = 0;
     this._chaseLimit = Math.max(3000, 5000-game.timeToImpact); // longer games => longer chases
     this._trigger = setTimeout(this._fire, this._getFireRate()); // must store timeout response to clear it later
-    new ParticleTrailAnimation(game, this, 2, 4);
+    // new ParticleTrailAnimation(game, this, 2, 4);
+    this.glowFrames = FPS*2;
+    this.colorGradient = Array.from({length: this.glowFrames}, (c, i) => fadeColor(this.color, 1-(i/this.glowFrames)));
+    this.gradientIndex = 0;
+    this.gradientStep = -1; // will flip on first call to `render()`
   }
   _getActiveState = () => { return !this.game.gameOver && this._chaseFrames < this._chaseLimit; }
-  _getFireRate = () => { return Math.max(500, 1500-this.game.score) }; // increase fire rate as score increases
+  _getFireRate = () => { return Math.max(1000, 1500-this.game.score) }; // slowly increase fire rate with score
   _fire = () => {
     if (this._getActiveState()) {
-      safePlayAudio(UFO_SFX_1);
-      new EnemyProjectile(this.game, this.loc, this.theta);
+      if (!this.game.paused) { // fire blanks while paused
+        safePlayAudio(UFO_SFX_1);
+        new EnemyProjectile(this.game, this.loc, this.theta);
+      } // but keep recursing so pattern continues on resume
       this._trigger = setTimeout(this._fire, this._getFireRate());
     }
   }
@@ -543,7 +553,13 @@ class UFO extends Hazard {
       if (Math.abs(dt) > Math.PI/4) this.theta += 0.05 * dt;
       this.vel.set(Math.cos(this.theta), Math.sin(this.theta), UFO_V);
       this._chaseFrames += 1;
+      if (UFO_SFX_0.ended) { safePlayAudio(UFO_SFX_0); }
     }
+  }
+  render = () => {
+    tracePoints(this._points(this.shape), this.shape, this.color, this.colorGradient[this.gradientIndex]);
+    if (this.gradientIndex <= 0 || this.gradientIndex >= this.colorGradient.length) { this.gradientStep *= -1; }
+    this.gradientIndex += this.gradientStep;
   }
 }
 
@@ -641,6 +657,7 @@ class ParticleTrailAnimation extends GameObject {
 class Game {
   constructor() {
     // flag for start screen on first arrival
+    safePlayAudio(TITLE_BGM);
     this.new = true;
     // timer
     this.lastTick = 0; // last time run() was executed
@@ -687,6 +704,7 @@ class Game {
   handlePause = () => {
     this.paused = !this.paused;
     if (this.paused) {
+      if (!this.new) safePlayAudio(PAUSE_SFX); // the very first call should be silent
       cancelAnimationFrame(this.frameReq);
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
@@ -701,13 +719,14 @@ class Game {
       displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
     }
     else {
-      
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
       if (this.new) { this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff)); }
       else { this.spawnHazard(); }
       this.frameReq = requestAnimationFrame(this.run);
       this.new = false;
+      TITLE_BGM.muted = true; // stop playing the title bgm on first start
+      safePlayAudio(PAUSE_SFX);
     }
   }
   register = (gameObj) => {
@@ -725,7 +744,7 @@ class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = DEBUG ? 300 : 0;
+    this.score = DEBUG ? 250 : 0;
     this.shots = 0;
     this.hits = 0;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
