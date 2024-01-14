@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.14.2'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.14.3'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -74,8 +74,12 @@ UPGRADE_SFX_1.volume = .2;
 const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
 const COMET_C = '#FD0';
 const COMET_R = ROCK_R * 0.7;
-const COMET_V = ROCK_V * 1.6;
+const COMET_V = ROCK_V * 1.7;
 const COMET_TA = 0.009; // per-frame turn amount (radians)
+const COMET_SFX_0 = document.getElementById('cometSfx_0');
+COMET_SFX_0.volume = .5;
+const COMET_SFX_1 = document.getElementById('cometSfx_1');
+COMET_SFX_1.volume = .2;
 
 // ufo
 const UFO_R = PLAYER_R * 1.5;
@@ -480,8 +484,10 @@ class Comet extends Asteroid {
     super(game, loc, null, COMET_V, COMET_R, PENTAGON, COMET_C, 2); //, null, null, PENTAGON, COMET_V, 2);
     this._turnAmt = randomVal(-COMET_TA, COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
+    safePlayAudio(COMET_SFX_0);
   }
-  _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*2); }
+  _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*3); }
+  _onDestroyAudio = () => { safePlayAudio(COMET_SFX_1); }
   _onDestroyHazard = () => { if (this.inBounds()) { this.value = 7; } }
   _onUpdate = () => {
     this.theta += this._turnAmt;
