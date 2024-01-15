@@ -5,7 +5,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.1'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.2'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -676,7 +676,7 @@ class Game {
     }
     // start game
     this.newGame();
-    this.frameReq = requestAnimationFrame(this.run);
+    requestAnimationFrame(this.run);
   }
   _handleTouchStart = (event) => {
     event.preventDefault(); // block resize on double-tap
@@ -705,25 +705,15 @@ class Game {
     this.paused = !this.paused;
     if (this.paused) {
       if (!this.new) safePlayAudio(PAUSE_SFX); // the very first call should be silent
-      cancelAnimationFrame(this.frameReq);
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
-      let pauseText = [
-        'BLASTEROIDS',
-        (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
-        (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-        (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'RESUME'),
-        DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', "SHAKE N' BAKE", 'GET READY'])
-      ]
-      // if (MOBILE) pauseText.splice(-1, 0, 'D-TAP TO SET GYRO');
-      displayTextBox(pauseText, this.player.loc.x, this.player.loc.y);
+      this.pauseText = this.createPauseText(); // it has a random message so we generate each time
     }
     else {
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
       if (this.new) { this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff)); }
       else { this.spawnHazard(); }
-      this.frameReq = requestAnimationFrame(this.run);
       this.new = false;
       TITLE_BGM.muted = true; // stop playing the title bgm on first start
       safePlayAudio(PAUSE_SFX);
@@ -800,6 +790,15 @@ class Game {
     }
     return false;
   }
+  createPauseText = () => {
+    this.pauseText = [
+      this.new ? 'BLASTEROIDS' : 'YOU ARE HERE',
+      (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
+      (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
+      (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'UNPAUSE'),
+      DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
+    ]
+  }
   createGameOverText = () => {
     let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.7);
     let pacifist = (this.shots === 0);
@@ -826,20 +825,20 @@ class Game {
     if (this.score >= 100) {
       rank = 'B';
       commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND', 'NAMASTE'] 
-                             : ['GOOD HUSTLE', 'VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
+                             : ['GOOD HUSTLE', 'VERY NICE', 'NOT TOO SHABBY', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A (S) rank
     if (sharpshooter && this.score >= 200) {
       rank = 'A'; 
-      commentPool = ['HOT SHOT', 'EAGLE EYE', 'JARATE'];
+      commentPool = ['HOT SHOT', 'EAGLE EYE', 'PRO'];
     }
     if (this.score >= 250) {
       rank = 'A';
-      commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'RARE'];
+      commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'A WINNER IS YOU', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 400) {
         rank = 'S';
         commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] 
-                               : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'A WINNER IS YOU', 'RAW'];
+                               : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'MONSTER', 'INHUMAN', 'RAW'];
       }
     }
     this.gameOverText = [
@@ -860,7 +859,7 @@ class Game {
     resizeCanvas(); // done each frame in case the window is resized
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (this.bgStars) {
-      if (!this.gameOver) { // couldn't use _inBounds() since check is per-axis
+      if (!this.gameOver && !this.paused) { // couldn't use _inBounds() since check is per-axis
         let moveX = 0 < this.player.loc.x && this.player.loc.x < canvas.width;
         let moveY = 0 < this.player.loc.y && this.player.loc.y < canvas.height;
         this.bgStars.forEach(point => { 
@@ -874,7 +873,11 @@ class Game {
     let padding = PADDING * getScale() * (MOBILE ? 5 : 1);
     let fontSize = FONT_SIZE * getScale();
     displayText(this.score, padding, padding + fontSize);
-    if (this.gameOver){
+    if (this.paused) {
+      if (!this.pauseText) this.createPauseText();
+      displayTextBox(this.pauseText, this.player.loc.x, this.player.loc.y);
+    }
+    if (this.gameOver) {
       if (!this.gameOverText) this.createGameOverText();
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
@@ -897,10 +900,11 @@ class Game {
           break;
         }
       }
-      this.render();
+      // this.render();
       this.cleanup();
     }
-    this.frameReq = requestAnimationFrame(this.run);
+    this.render();
+    requestAnimationFrame(this.run);
   }
 }
 
