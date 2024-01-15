@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.3'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.4'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -33,7 +33,7 @@ const PARALLAX = 0.3333                   // ratio for parallax effect
 const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 const TITLE_BGM = document.getElementById('titleBgm');
-TITLE_BGM.volume = .4;
+TITLE_BGM.volume = .3;
 const GAME_BGM = document.getElementById('gameBgm');
 GAME_BGM.volume = .3;
 const JINGLE_RANK_D = document.getElementById('rankSfx_D');
@@ -401,7 +401,6 @@ class Player extends GameObject {
   _onDestroy = () => {
     this.game.gameOver = true;
     this.deregisterInputs();
-    safeToggleAudio(GAME_BGM);
     // safePlayAudio(BOOM_SFX_2); // clashes with the endgame jingle
     // new ExplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius()*10);
     // BUG: the game doesn't update in the game over state, so this^ animation never plays (WONTFIX)
@@ -743,9 +742,11 @@ class Game {
     else {
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
-      if (this.new) { this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff)); }
+      if (this.new) { 
+        this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff));
+        safeToggleAudio(TITLE_BGM); // stop playing the title bgm on first start
+      }
       else { this.spawnHazard(); }
-      TITLE_BGM.muted = true; // stop playing the title bgm on first start
       safePlayAudio(PAUSE_SFX);
       safeToggleAudio(GAME_BGM);
       this.new = false;
@@ -772,13 +773,14 @@ class Game {
     this.rank = null;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
-    this.timeToImpact = DEBUG ? 5000 : 2500;
+    this.timeToImpact = this.new ? 3000 : 2000;
     this.upgradeInPlay = false;
     this.createBgStars();
     if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
-    else { 
+    else {
+      GAME_BGM.volume = 0.3; // reset volume from fade out
+      safePlayAudio(GAME_BGM); // and restart the music
       this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact);
-      safePlayAudio(GAME_BGM);
     }
   }
   createBgStars = () => {
@@ -914,24 +916,33 @@ class Game {
     }
     if (this.gameOver) {
       if (!this.gameOverText) { // null text = first pass after game over; creating text will generate rank for sfx
+        safeToggleAudio(GAME_BGM);
         this.createGameOverText();
+        let audio = null;
         switch(this.rank) {
           case 'D':
-            safePlayAudio(JINGLE_RANK_D);
+            audio = (JINGLE_RANK_D);
             break;
           case 'C':
-            safePlayAudio(JINGLE_RANK_C);
+            audio = (JINGLE_RANK_C);
             break;
           case 'B':
-            safePlayAudio(JINGLE_RANK_B);
+            audio = (JINGLE_RANK_B);
             break;
           case 'A':
-            safePlayAudio(JINGLE_RANK_A);
+            audio = (JINGLE_RANK_A);
             break;
           case 'S':
-            safePlayAudio(JINGLE_RANK_S);
+            audio = (JINGLE_RANK_S);
             break;
         }
+        audio.onended = (event) => { safeToggleAudio(GAME_BGM); };
+        safePlayAudio(audio);  
+      }
+      if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0002; } // fade out on game over screen
+      else { 
+        GAME_BGM.volume = 0;
+        safeToggleAudio(GAME_BGM);
       }
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
