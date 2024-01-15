@@ -683,16 +683,8 @@ class ParticleTrailAnimation extends GameObject {
 
 class Game {
   constructor() {
-    // flag for start screen on first arrival
     safePlayAudio(TITLE_BGM);
-    this.new = true;
-    // timer
-    this.lastTick = 0; // last time run() was executed
-    this.deltaTime = 0;
-    // object management
-    this.nextObjectId = -1; // will increment to 0 on first registration
-    this.cleanupIds = [];
-    // inputs
+    this.new = true; // flag for game start text on first arrival
     if (MOBILE) {
       this.waitingForDoubleTap = false;
       this.longPress = null;
@@ -701,7 +693,6 @@ class Game {
     } else {
       window.addEventListener('keydown', this._handleKeyInput);
     }
-    // start game
     this.newGame();
     requestAnimationFrame(this.run);
   }
@@ -740,13 +731,14 @@ class Game {
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
     }
     else {
-      let timeDiff = (Date.now() - this.pauseTime);
-      this.lastTick += timeDiff;
       if (this.new) { 
-        this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff));
+        this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact));
         TITLE_BGM.muted = true; // explicitly muted over toggle because it's short and may not autoplay
       }
-      else { this.spawnHazard(); }
+      else {
+        this.lastTick += (Date.now() - this.pauseTime);
+        this.spawnHazard();
+      }
       safePlayAudio(PAUSE_SFX);
       safeToggleAudio(GAME_BGM);
       this.new = false;
@@ -763,15 +755,19 @@ class Game {
   }
   newGame = () => {
     resizeCanvas(); // covering all bases
+    this.lastTick = 0; // last time run() was executed
+    this.deltaTime = 0;
     this.paused = false;
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = DEBUG ? 250 : 0;
+    this.score = 0; //DEBUG ? 250 : 0;
     this.shots = 0;
     this.hits = 0;
     this.rank = null;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
+    this.nextObjectId = -1; // will increment to 0 on first registration
+    this.cleanupIds = [];
     this.player = new Player(this);
     this.timeToImpact = this.new ? 3000 : 2000;
     this.upgradeInPlay = false;
