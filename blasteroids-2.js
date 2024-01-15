@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.4'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.5'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -735,7 +735,7 @@ class Game {
         safePlayAudio(PAUSE_SFX);
         safeToggleAudio(GAME_BGM);
       } 
-      clearTimeout(this.asteroidTimer);
+      clearTimeout(this.hazardTimer);
       this.pauseTime = Date.now();
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
     }
@@ -743,7 +743,7 @@ class Game {
       let timeDiff = (Date.now() - this.pauseTime);
       this.lastTick += timeDiff;
       if (this.new) { 
-        this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff));
+        this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff));
         safeToggleAudio(TITLE_BGM); // stop playing the title bgm on first start
       }
       else { this.spawnHazard(); }
@@ -780,7 +780,7 @@ class Game {
     else {
       GAME_BGM.volume = 0.3; // reset volume from fade out
       safePlayAudio(GAME_BGM); // and restart the music
-      this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact);
+      this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
   createBgStars = () => {
@@ -813,7 +813,7 @@ class Game {
       }
       new spawnClass(this, randomSpawn()); // new Vector2(x, y));
       if (this.timeToImpact > (DEBUG ? 5000 : 1000)) { this.timeToImpact -= 25; }
-      this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact);
+      this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
   checkAsteroidCollision = (collisionObj) => {
@@ -890,7 +890,15 @@ class Game {
   }
   update = () => { 
     if (!this.paused) { this.gameObjects.forEach((gameObj) => { gameObj.update() }); }
-    if (this.gameOver) { clearTimeout(this.asteroidTimer); }
+    if (this.gameOver) {
+      clearTimeout(this.hazardTimer); // stop spawning new hazards
+      if (this.gameObjects.length > 0) { this.gameObjects.forEach(obj => obj.destroy()); }
+      // ^ there was a race condition where UFO._fire() could schedule a timeout that resolved after game over.
+      // resetting the game too quickly reassigns this.gameObjects to a new Map(), but the old object stays
+      // in memory. it never gets called to update or render, but since it keeps a reference to the current game, which
+      // in a valid state (not game over and not paused), it can spawn projectiles indefinitely from its last location.
+      // Long story long, all gameObjects now are explicitly destroyed on game over to prevent this.
+    }
   }
   render = () => {
     resizeCanvas(); // done each frame in case the window is resized
@@ -936,7 +944,7 @@ class Game {
             audio = (JINGLE_RANK_S);
             break;
         }
-        audio.onended = (event) => { safeToggleAudio(GAME_BGM); };
+        audio.onended = (event) => { if (this.gameOver) { safeToggleAudio(GAME_BGM); } };
         safePlayAudio(audio);  
       }
       if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0002; } // fade out on game over screen
@@ -966,8 +974,9 @@ class Game {
         }
       }
       // this.render();
-      this.cleanup();
+      // this.cleanup();
     }
+    this.cleanup();
     this.render();
     requestAnimationFrame(this.run);
   }
