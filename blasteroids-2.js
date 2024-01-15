@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.5'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.6'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -37,9 +37,9 @@ TITLE_BGM.volume = .3;
 const GAME_BGM = document.getElementById('gameBgm');
 GAME_BGM.volume = .3;
 const JINGLE_RANK_D = document.getElementById('rankSfx_D');
-JINGLE_RANK_D.volume = .7;
+JINGLE_RANK_D.volume = .5;
 const JINGLE_RANK_C = document.getElementById('rankSfx_C');
-JINGLE_RANK_C.volume = .7;
+JINGLE_RANK_C.volume = .6;
 const JINGLE_RANK_B = document.getElementById('rankSfx_B');
 JINGLE_RANK_B.volume = 1;
 const JINGLE_RANK_A = document.getElementById('rankSfx_A');
@@ -744,7 +744,7 @@ class Game {
       this.lastTick += timeDiff;
       if (this.new) { 
         this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff));
-        safeToggleAudio(TITLE_BGM); // stop playing the title bgm on first start
+        TITLE_BGM.muted = true; // explicitly muted over toggle because it's short and may not autoplay
       }
       else { this.spawnHazard(); }
       safePlayAudio(PAUSE_SFX);
