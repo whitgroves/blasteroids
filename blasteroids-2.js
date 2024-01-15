@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.6'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.7'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -35,7 +35,8 @@ PAUSE_SFX.volume = .4;
 const TITLE_BGM = document.getElementById('titleBgm');
 TITLE_BGM.volume = .3;
 const GAME_BGM = document.getElementById('gameBgm');
-GAME_BGM.volume = .3;
+const GAME_BGM_VOL = .3; // used to restore default after bgm fade on game over
+GAME_BGM.volume = GAME_BGM_VOL;
 const JINGLE_RANK_D = document.getElementById('rankSfx_D');
 JINGLE_RANK_D.volume = .5;
 const JINGLE_RANK_C = document.getElementById('rankSfx_C');
@@ -175,7 +176,6 @@ fadeColor = (color, alpha) => {
 // sfx
 safePlayAudio = (audio) => {
   if (audio) { // make sure file is actually loaded first
-    audio.muted = false; // ...and that it's not muted
     audio.pause(); // https://stackoverflow.com/q/14834520
     audio.currentTime = 0;
     audio.play();
@@ -184,7 +184,6 @@ safePlayAudio = (audio) => {
 safeToggleAudio = (audio) => {
   if (audio) {
     if (audio.paused) {
-      audio.muted = false;
       audio.play();
     }
     else { audio.pause(); }
@@ -717,6 +716,8 @@ class Game {
        this.handlePause();
     } else if (this.gameOver && event.key === 'Escape') {
       this.newGame();
+    } else if (event.key === 'm') {
+      GAME_BGM.muted = GAME_BGM && !GAME_BGM.muted;
     }
   }
   handlePause = () => {
@@ -774,8 +775,8 @@ class Game {
     this.createBgStars();
     if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
     else {
-      GAME_BGM.volume = 0.3; // reset volume from fade out
-      safePlayAudio(GAME_BGM); // and restart the music
+      if (GAME_BGM.paused) { safePlayAudio(GAME_BGM); } // restart after total fade out
+      GAME_BGM.volume = GAME_BGM_VOL; // reset volume regardless
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
@@ -920,7 +921,6 @@ class Game {
     }
     if (this.gameOver) {
       if (!this.gameOverText) { // null text = first pass after game over; creating text will generate rank for sfx
-        safeToggleAudio(GAME_BGM);
         this.createGameOverText();
         let audio = null;
         switch(this.rank) {
@@ -940,13 +940,14 @@ class Game {
             audio = (JINGLE_RANK_S);
             break;
         }
-        audio.onended = (event) => { if (this.gameOver) { safeToggleAudio(GAME_BGM); } };
-        safePlayAudio(audio);  
+        audio.onended = (event) => { if (this.gameOver) { safeToggleAudio(GAME_BGM); } }; // resume bgm when done
+        safeToggleAudio(GAME_BGM); // pause as late as possible to minimize audio gap
+        safePlayAudio(audio);
       }
-      if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0002; } // fade out on game over screen
+      if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0001; } // fade out
       else { 
         GAME_BGM.volume = 0;
-        safeToggleAudio(GAME_BGM);
+        safeToggleAudio(GAME_BGM); // after full fade out, pause flag is used to restart bgm
       }
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
