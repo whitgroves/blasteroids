@@ -726,7 +726,7 @@ class Game {
       if (!this.new) { // the very first call should be silent
         safePlayAudio(PAUSE_SFX);
         safeToggleAudio(GAME_BGM);
-      } 
+      }
       clearTimeout(this.hazardTimer);
       this.pauseTime = Date.now();
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
@@ -755,6 +755,7 @@ class Game {
     this.cleanupIds = [];
   }
   newGame = () => {
+    if (this.jingle && !this.jingle.paused) { safeToggleAudio(this.jingle); } // stop rank jingle ASAP on early reset
     resizeCanvas(); // covering all bases
     this.lastTick = 0; // last time run() was executed
     this.deltaTime = 0;
@@ -766,6 +767,7 @@ class Game {
     this.shots = 0;
     this.hits = 0;
     this.rank = null;
+    this.jingle = null; 
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.nextObjectId = -1; // will increment to 0 on first registration
     this.cleanupIds = [];
@@ -922,27 +924,26 @@ class Game {
     if (this.gameOver) {
       if (!this.gameOverText) { // null text = first pass after game over; creating text will generate rank for sfx
         this.createGameOverText();
-        let audio = null;
         switch(this.rank) {
           case 'D':
-            audio = (JINGLE_RANK_D);
+            this.jingle = (JINGLE_RANK_D);
             break;
           case 'C':
-            audio = (JINGLE_RANK_C);
+            this.jingle = (JINGLE_RANK_C);
             break;
           case 'B':
-            audio = (JINGLE_RANK_B);
+            this.jingle = (JINGLE_RANK_B);
             break;
           case 'A':
-            audio = (JINGLE_RANK_A);
+            this.jingle = (JINGLE_RANK_A);
             break;
           case 'S':
-            audio = (JINGLE_RANK_S);
+            this.jingle = (JINGLE_RANK_S);
             break;
         }
-        audio.onended = (event) => { if (this.gameOver) { safeToggleAudio(GAME_BGM); } }; // resume bgm when done
+        this.jingle.onended = (e) => { if (this.gameOver) { safeToggleAudio(GAME_BGM); } }; // resume bgm when done
         safeToggleAudio(GAME_BGM); // pause as late as possible to minimize audio gap
-        safePlayAudio(audio);
+        safePlayAudio(this.jingle);
       }
       if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0001; } // fade out
       else { 
@@ -970,8 +971,6 @@ class Game {
           break;
         }
       }
-      // this.render();
-      // this.cleanup();
     }
     this.cleanup();
     this.render();
