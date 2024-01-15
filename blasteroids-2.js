@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.7'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.8'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -684,6 +684,7 @@ class Game {
   constructor() {
     safePlayAudio(TITLE_BGM);
     this.new = true; // flag for game start text on first arrival
+    this.lastTick = 0; // tracks ms since first arrival for deltaTime calcs
     if (MOBILE) {
       this.waitingForDoubleTap = false;
       this.longPress = null;
@@ -757,7 +758,6 @@ class Game {
   newGame = () => {
     if (this.jingle && !this.jingle.paused) { safeToggleAudio(this.jingle); } // stop rank jingle ASAP on early reset
     resizeCanvas(); // covering all bases
-    this.lastTick = 0; // last time run() was executed
     this.deltaTime = 0;
     this.paused = false;
     this.pauseTime = null;
@@ -890,13 +890,13 @@ class Game {
   update = () => { 
     if (!this.paused) { this.gameObjects.forEach((gameObj) => { gameObj.update() }); }
     if (this.gameOver) {
-      clearTimeout(this.hazardTimer); // stop spawning new hazards
-      if (this.gameObjects.length > 0) { this.gameObjects.forEach(obj => obj.destroy()); }
-      // ^ there was a race condition where UFO._fire() could schedule a timeout that resolved after game over.
-      // resetting the game too quickly reassigns this.gameObjects to a new Map(), but the old object stays
-      // in memory. it never gets called to update or render, but since it keeps a reference to the current game, which
-      // in a valid state (not game over and not paused), it can spawn projectiles indefinitely from its last location.
-      // Long story long, all gameObjects now are explicitly destroyed on game over to prevent this.
+    clearTimeout(this.hazardTimer); // stop spawning new hazards
+    if (this.gameObjects.length > 0) { this.gameObjects.forEach(obj => obj.destroy()); }
+    // ^ there was a race condition where UFO._fire() could schedule a timeout that resolved after game over.
+    // resetting the game too quickly reassigns this.gameObjects to a new Map(), but the old object stays
+    // in memory. it never gets called to update or render, but since it keeps a reference to the current game, which
+    // in a valid state (not game over and not paused), it can spawn projectiles indefinitely from its last location.
+    // Long story long, all gameObjects now are explicitly destroyed on game over to prevent this.
     }
   }
   render = () => {
@@ -972,7 +972,7 @@ class Game {
         }
       }
     }
-    this.cleanup();
+        this.cleanup();
     this.render();
     requestAnimationFrame(this.run);
   }
