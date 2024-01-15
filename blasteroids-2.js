@@ -1,6 +1,8 @@
 // Blasteroids by whitgroves
 // Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, freesound.org, and viewers like you
 
+attribution = ""
+
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -31,6 +33,8 @@ const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 const TITLE_BGM = document.getElementById('titleBgm');
 TITLE_BGM.volume = .4;
+const GAME_BGM = document.getElementById('gameBgm');
+GAME_BGM.volume = .4;
 
 // player
 const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
@@ -55,6 +59,8 @@ const BOOM_SFX_0 = document.getElementById('boomSfx_0');
 BOOM_SFX_0.volume = 0.2;
 const BOOM_SFX_1 = document.getElementById('boomSfx_1');
 BOOM_SFX_1.volume = 0.2;
+const BOOM_SFX_2 = document.getElementById('boomSfx_2');
+BOOM_SFX_2.volume = 0.4;
 
 // asteroid 
 const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
@@ -162,6 +168,15 @@ safePlayAudio = (audio) => {
     audio.pause(); // https://stackoverflow.com/q/14834520
     audio.currentTime = 0;
     audio.play();
+  }
+}
+safeToggleAudio = (audio) => {
+  if (audio) {
+    if (audio.paused) {
+      audio.muted = false;
+      audio.play();
+    }
+    else { audio.pause(); }
   }
 }
 
@@ -375,7 +390,10 @@ class Player extends GameObject {
   _onDestroy = () => {
     this.game.gameOver = true;
     this.deregisterInputs();
-    new ExplosionAnimation(this.game, this.loc.copy(), this.color, 400*getScale());
+    safeToggleAudio(GAME_BGM);
+    safePlayAudio(BOOM_SFX_2);
+    // new ExplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius()*10);
+    // BUG: the game doesn't update in the game over state, so this^ animation never plays (WONTFIX)
   }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > TILT_THRESH}
   _safeUpdateVelocity = (v) => {
@@ -520,8 +538,7 @@ class UFO extends Hazard {
     this._chaseFrames = 0;
     this._chaseLimit = Math.max(3000, 5000-game.timeToImpact); // longer games => longer chases
     this._trigger = setTimeout(this._fire, this._getFireRate()); // must store timeout response to clear it later
-    // new ParticleTrailAnimation(game, this, 2, 4);
-    this.glowFrames = FPS*2;
+    this.glowFrames = FPS*2.5;
     this.colorGradient = Array.from({length: this.glowFrames}, (c, i) => fadeColor(this.color, 1-(i/this.glowFrames)));
     this.gradientIndex = 0;
     this.gradientStep = -1; // will flip on first call to `render()`
@@ -704,7 +721,10 @@ class Game {
   handlePause = () => {
     this.paused = !this.paused;
     if (this.paused) {
-      if (!this.new) safePlayAudio(PAUSE_SFX); // the very first call should be silent
+      if (!this.new) { // the very first call should be silent
+        safePlayAudio(PAUSE_SFX);
+        safeToggleAudio(GAME_BGM);
+      } 
       clearTimeout(this.asteroidTimer);
       this.pauseTime = Date.now();
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
@@ -714,9 +734,10 @@ class Game {
       this.lastTick += timeDiff;
       if (this.new) { this.asteroidTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact-timeDiff)); }
       else { this.spawnHazard(); }
-      this.new = false;
       TITLE_BGM.muted = true; // stop playing the title bgm on first start
       safePlayAudio(PAUSE_SFX);
+      safeToggleAudio(GAME_BGM);
+      this.new = false;
     }
   }
   register = (gameObj) => {
@@ -743,7 +764,10 @@ class Game {
     this.upgradeInPlay = false;
     this.createBgStars();
     if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
-    else { this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact); }
+    else { 
+      this.asteroidTimer = setTimeout(this.spawnHazard, this.timeToImpact);
+      safePlayAudio(GAME_BGM);
+    }
   }
   createBgStars = () => {
     this.bgStars = [];
@@ -784,7 +808,6 @@ class Game {
       if ('isHazard' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
-        // new ExplosionAnimation(this, gameObj.loc.copy(), gameObj.color, gameObj.getRadius());
         return true;
       }
     }
@@ -795,7 +818,7 @@ class Game {
       this.new ? 'BLASTEROIDS' : 'YOU ARE HERE',
       (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
       (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-      (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'UNPAUSE'),
+      (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'RESUME'),
       DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
