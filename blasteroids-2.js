@@ -1,13 +1,14 @@
 // Blasteroids by whitgroves
 // Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, freesound.org, and viewers like you
 
-attribution = ""
+console.log("Game audio used courtesy of freesound.org and the respective artists. \
+For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.2'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.3'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -34,7 +35,17 @@ PAUSE_SFX.volume = .4;
 const TITLE_BGM = document.getElementById('titleBgm');
 TITLE_BGM.volume = .4;
 const GAME_BGM = document.getElementById('gameBgm');
-GAME_BGM.volume = .4;
+GAME_BGM.volume = .3;
+const JINGLE_RANK_D = document.getElementById('rankSfx_D');
+JINGLE_RANK_D.volume = .7;
+const JINGLE_RANK_C = document.getElementById('rankSfx_C');
+JINGLE_RANK_C.volume = .7;
+const JINGLE_RANK_B = document.getElementById('rankSfx_B');
+JINGLE_RANK_B.volume = 1;
+const JINGLE_RANK_A = document.getElementById('rankSfx_A');
+JINGLE_RANK_A.volume = .4;
+const JINGLE_RANK_S = document.getElementById('rankSfx_S');
+JINGLE_RANK_S.volume = .3;
 
 // player
 const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
@@ -391,7 +402,7 @@ class Player extends GameObject {
     this.game.gameOver = true;
     this.deregisterInputs();
     safeToggleAudio(GAME_BGM);
-    safePlayAudio(BOOM_SFX_2);
+    // safePlayAudio(BOOM_SFX_2); // clashes with the endgame jingle
     // new ExplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius()*10);
     // BUG: the game doesn't update in the game over state, so this^ animation never plays (WONTFIX)
   }
@@ -507,7 +518,7 @@ class Upgrade extends Hazard { // not really a hazard but behavior is 90% the sa
 
 class Comet extends Asteroid {
   constructor(game, loc) {
-    super(game, loc, null, COMET_V, COMET_R, PENTAGON, COMET_C, 2); //, null, null, PENTAGON, COMET_V, 2);
+    super(game, loc, null, COMET_V, COMET_R, PENTAGON, COMET_C, 0); // only give points if hit
     this._turnAmt = randomVal(-COMET_TA, COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
     safePlayAudio(COMET_SFX_0);
@@ -758,6 +769,7 @@ class Game {
     this.score = DEBUG ? 250 : 0;
     this.shots = 0;
     this.hits = 0;
+    this.rank = null;
     this.gameObjects = new Map(); // clear stray asteroids before player spawns
     this.player = new Player(this);
     this.timeToImpact = DEBUG ? 5000 : 2500;
@@ -826,40 +838,40 @@ class Game {
     let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.7);
     let pacifist = (this.shots === 0);
     // D rank
-    let rank = 'D';
+    this.rank = 'D';
     let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU',
                        'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
     if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
     // C rank
     if (sharpshooter && this.score >= 25) {
-      rank = 'C';
+      this.rank = 'C';
       commentPool = ['HEATING UP', "LET 'EM COOK"];
     }
     if (this.score >= 50) {
-      rank = 'C';
+      this.rank = 'C';
       commentPool = pacifist ? ['NAILED IT', 'PHONE HOME'] 
                              : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 75) {
-      rank = 'B';
+      this.rank = 'B';
       commentPool = ["NICE SHOOTIN' TEX", 'LOCKED IN'];
     }
     if (this.score >= 100) {
-      rank = 'B';
+      this.rank = 'B';
       commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND', 'NAMASTE'] 
                              : ['GOOD HUSTLE', 'VERY NICE', 'NOT TOO SHABBY', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A (S) rank
     if (sharpshooter && this.score >= 200) {
-      rank = 'A'; 
+      this.rank = 'A'; 
       commentPool = ['HOT SHOT', 'EAGLE EYE', 'PRO'];
     }
     if (this.score >= 250) {
-      rank = 'A';
+      this.rank = 'A';
       commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'A WINNER IS YOU', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 400) {
-        rank = 'S';
+        this.rank = 'S';
         commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] 
                                : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'MONSTER', 'INHUMAN', 'RAW'];
       }
@@ -868,7 +880,7 @@ class Game {
       'GAME OVER',
       'SCORE: '+this.score,
       // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
-      'RANK : '+rank,
+      'RANK : '+this.rank,
       randomChoice(commentPool), //comment,
       'THANKS FOR PLAYING',
       (MOBILE ? 'HOLD' : 'ESC') + ' FOR NEW GAME'
@@ -901,7 +913,26 @@ class Game {
       displayTextBox(this.pauseText, this.player.loc.x, this.player.loc.y);
     }
     if (this.gameOver) {
-      if (!this.gameOverText) this.createGameOverText();
+      if (!this.gameOverText) { // null text = first pass after game over; creating text will generate rank for sfx
+        this.createGameOverText();
+        switch(this.rank) {
+          case 'D':
+            safePlayAudio(JINGLE_RANK_D);
+            break;
+          case 'C':
+            safePlayAudio(JINGLE_RANK_C);
+            break;
+          case 'B':
+            safePlayAudio(JINGLE_RANK_B);
+            break;
+          case 'A':
+            safePlayAudio(JINGLE_RANK_A);
+            break;
+          case 'S':
+            safePlayAudio(JINGLE_RANK_S);
+            break;
+        }
+      }
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
     if (DEBUG && this.player.tilt) {
