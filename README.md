@@ -1,5 +1,5 @@
 # blasteroids 
-Inspired by the 1979 classic. You can play it on desktop or mobile at https://blasteroids.io/
+Inspired by the arcade classic. You can play it on desktop or mobile at https://blasteroids.io/
 
 Audio files used, unchanged, courtesy of [freesound.org](https://freesound.org/) and their respective artists:
 - [retro shot blaster](https://freesound.org/s/257232/) by JavierZumer ([Attribution 4.0](https://creativecommons.org/licenses/by/4.0/))
@@ -20,3 +20,5 @@ Audio files used, unchanged, courtesy of [freesound.org](https://freesound.org/)
 - [SFX-Success!.wav](https://freesound.org/s/448274/) by HenryRichard ([Creative Commons 0](https://creativecommons.org/public-domain/cc0/))
 - [Jingle_Win_00.wav](https://freesound.org/s/270333/) by LittleRobotSoundFactory ([Attribution 4.0](https://creativecommons.org/licenses/by/4.0/))
 - [Dancy](https://freesound.org/s/256143/) by jmayoff ([Creative Commons 0](https://creativecommons.org/public-domain/cc0/))
+
+Special thanks to Mom & Dad, Ragamuffin, u/ruairidx, and u/ggonryun for your support and feedback.
