@@ -1,5 +1,5 @@
 // Blasteroids by whitgroves
-// Special thanks to Mom & Dad, Paul, u/ruairidx, u/ggonryun, freesound.org, and viewers like you
+// Special thanks to Mom & Dad, Ragamuffin, u/ruairidx, u/ggonryun, freesound.org, and viewers like you
 
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.9'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.16.0'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -837,7 +837,7 @@ class Game {
     ]
   }
   rankPlayer = () => {
-    let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.65);
+    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.7);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';
@@ -845,38 +845,38 @@ class Game {
                        'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
     if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
     // C rank
-    if (sharpshooter && this.score >= 20) {
+    if (sharpshooter && this.score >= 30) {
       this.rank = 'C';
       commentPool = ['HEATING UP', "LET 'EM COOK"];
     }
     if (this.score >= 45) {
       this.rank = 'C';
       commentPool = pacifist ? ['NAILED IT', 'PHONE HOME'] 
-                             : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MID', 'MEDIUM WELL'];
+                             : ['GOOD HUSTLE', 'NOT BAD', 'GETTING SOMEWHERE', 'MEDIUM WELL'];
     }
     // B rank
     if (sharpshooter && this.score >= 65) {
       this.rank = 'B';
-      commentPool = ["NICE SHOOTIN' TEX", 'LOCKED IN'];
+      commentPool = ["NICE SHOOTIN' TEX", 'MORE COFFEE SIR?'];
     }
     if (this.score >= 90) {
       this.rank = 'B';
-      commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND', 'NAMASTE'] 
-                             : ['GOOD HUSTLE', 'VERY NICE', 'NOT TOO SHABBY', 'SOLID', 'RESPECT+', 'WELL DONE'];
+      commentPool = pacifist ? ['CHOSEN ONE', 'ZEN MODE', 'NAMASTE'] 
+                             : ['VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A (S) rank
     if (sharpshooter && this.score >= 180) {
       this.rank = 'A'; 
-      commentPool = ['HOT SHOT', 'EAGLE EYE', 'PRO'];
+      commentPool = ['LOCKED IN', 'EAGLE EYE'];
     }
     if (this.score >= 270) {
       this.rank = 'A';
-      commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'A WINNER IS YOU', 'RARE'];
-      if (sharpshooter || pacifist || this.score >= 500) {
+      commentPool = ['TOP NOTCH', 'EXCELLENT', 'A WINNER IS YOU', 'RARE'];
+      if (sharpshooter || pacifist || this.score >= 1080) {
         this.rank = 'S';
-        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] :
-                  sharpshooter ? ['EAGLE EYE', 'SHOW OFF', 'MORE COFFEE SIR?']
-                               : ['SEEK HELP', 'CHILL OUT', 'MONSTER', 'INHUMAN', 'RAW'];
+        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', '哲人'] :
+                  sharpshooter ? ['HOT SHOT', 'SHOW OFF', 'LEGEND']
+                               : ['SEEK HELP', 'CHILL OUT', 'RAW'];
       }
     }
     this.gameOverText = [
@@ -947,7 +947,7 @@ class Game {
         safeToggleAudio(GAME_BGM); // pause as late as possible to minimize audio gap
         safePlayAudio(this.jingle);
       }
-      if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0001; } // fade out
+      if (GAME_BGM.volume > 0.005) { GAME_BGM.volume -= 0.0002; } // fade out
       else { 
         GAME_BGM.volume = 0;
         safeToggleAudio(GAME_BGM); // after full fade out, pause flag is used to restart bgm
