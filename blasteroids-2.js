@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.15.8'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.15.9'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -17,7 +17,7 @@ const LTAP_TIMEOUT = 500; // how long to wait for a long press
 const TILT_THRESH = 3;
 
 let lastOrientation = screen.orientation.type;
-if (MOBILE && DEBUG) alert(lastOrientation);
+// if (MOBILE && DEBUG) alert(lastOrientation);
 
 // game settings
 const FPS = 60
@@ -38,11 +38,11 @@ const GAME_BGM = document.getElementById('gameBgm');
 const GAME_BGM_VOL = .3; // used to restore default after bgm fade on game over
 GAME_BGM.volume = GAME_BGM_VOL;
 const JINGLE_RANK_D = document.getElementById('rankSfx_D');
-JINGLE_RANK_D.volume = .5;
+JINGLE_RANK_D.volume = .7;
 const JINGLE_RANK_C = document.getElementById('rankSfx_C');
-JINGLE_RANK_C.volume = .6;
+JINGLE_RANK_C.volume = .5;
 const JINGLE_RANK_B = document.getElementById('rankSfx_B');
-JINGLE_RANK_B.volume = 1;
+JINGLE_RANK_B.volume = .5;
 const JINGLE_RANK_A = document.getElementById('rankSfx_A');
 JINGLE_RANK_A.volume = .4;
 const JINGLE_RANK_S = document.getElementById('rankSfx_S');
@@ -390,7 +390,7 @@ class Player extends GameObject {
       if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
       resizeCanvas();                                 // adjust for new dims
       this.game.createBgStars();                      // stars need to be redrawn because of new dims
-      if (DEBUG) alert('x:'+canvas.width+' y:'+canvas.height);
+      // if (DEBUG) alert('x:'+canvas.width.toFixed(2)+' y:'+canvas.height.toFixed(2));
     }
   }
   _onMouseMove = (event) => { this.target = new Vector2(event.x, event.y) }
@@ -704,7 +704,8 @@ class Game {
       setTimeout(() => { this.waitingForDoubleTap = false }, DTAP_TIMEOUT);
     } else if (this.paused) { // recalibrate
       this.player.neutral = null; // neutral pos will reset on resume
-      if (DEBUG) alert('gyroscope will reset on resume');
+      safePlayAudio(PAUSE_SFX); // audio cue
+      // if (DEBUG) alert('gyroscope will reset on resume');
     }
   }
   _handleTouchEnd = (event) => { // long press
@@ -835,8 +836,8 @@ class Game {
       DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
-  createGameOverText = () => {
-    let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.7);
+  rankPlayer = () => {
+    let sharpshooter = (this.shots > 10 && this.hits >= this.shots * 0.65);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';
@@ -844,37 +845,38 @@ class Game {
                        'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
     if (pacifist) commentPool = [(MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
     // C rank
-    if (sharpshooter && this.score >= 25) {
+    if (sharpshooter && this.score >= 20) {
       this.rank = 'C';
       commentPool = ['HEATING UP', "LET 'EM COOK"];
     }
-    if (this.score >= 50) {
+    if (this.score >= 45) {
       this.rank = 'C';
       commentPool = pacifist ? ['NAILED IT', 'PHONE HOME'] 
-                             : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MEDIUM WELL'];
+                             : ['ROOKIE', 'NOT BAD', 'GETTING SOMEWHERE', 'GOING PLACES', 'MID', 'MEDIUM WELL'];
     }
     // B rank
-    if (sharpshooter && this.score >= 75) {
+    if (sharpshooter && this.score >= 65) {
       this.rank = 'B';
       commentPool = ["NICE SHOOTIN' TEX", 'LOCKED IN'];
     }
-    if (this.score >= 100) {
+    if (this.score >= 90) {
       this.rank = 'B';
       commentPool = pacifist ? ['CHOSEN ONE', 'EMPTY MIND', 'NAMASTE'] 
                              : ['GOOD HUSTLE', 'VERY NICE', 'NOT TOO SHABBY', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A (S) rank
-    if (sharpshooter && this.score >= 200) {
+    if (sharpshooter && this.score >= 180) {
       this.rank = 'A'; 
       commentPool = ['HOT SHOT', 'EAGLE EYE', 'PRO'];
     }
-    if (this.score >= 250) {
+    if (this.score >= 270) {
       this.rank = 'A';
       commentPool = ['TOP NOTCH', 'AMAZING', 'EXCELLENT', 'MISSION ACCOMPLISHED', 'A WINNER IS YOU', 'RARE'];
-      if (sharpshooter || pacifist || this.score >= 400) {
+      if (sharpshooter || pacifist || this.score >= 500) {
         this.rank = 'S';
-        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] 
-                               : ['SEEK HELP', 'SHOW OFF', 'CHILL OUT', 'MONSTER', 'INHUMAN', 'RAW'];
+        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', 'NO TROUBLE'] :
+                  sharpshooter ? ['EAGLE EYE', 'SHOW OFF', 'MORE COFFEE SIR?']
+                               : ['SEEK HELP', 'CHILL OUT', 'MONSTER', 'INHUMAN', 'RAW'];
       }
     }
     this.gameOverText = [
@@ -923,7 +925,7 @@ class Game {
     }
     if (this.gameOver) {
       if (!this.gameOverText) { // null text = first pass after game over; creating text will generate rank for sfx
-        this.createGameOverText();
+        this.rankPlayer();
         switch(this.rank) {
           case 'D':
             this.jingle = (JINGLE_RANK_D);
@@ -953,8 +955,8 @@ class Game {
       displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
     if (DEBUG && this.player.tilt) {
-      displayText('x:'+this.player.tilt.x, padding, canvas.height-fontSize*2);
-      displayText('y:'+this.player.tilt.y, padding, padding + canvas.height-fontSize);
+      displayText('x:'+this.player.tilt.x.toFixed(2), padding, canvas.height-fontSize*2);
+      displayText('y:'+this.player.tilt.y.toFixed(2), padding, padding + canvas.height-fontSize);
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
