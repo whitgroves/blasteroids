@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Full Screen Test</title>
+    <style>
+        #content { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <iframe src="./debug.html" id="content"></iframe>
+    </div>
+    <script> // fullscreen on enter
+        function toggleFullScreen(element) {
+            if (!document.fullscreenElement) { element.requestFullscreen(); }
+            else if (document.exitFullscreen) { document.exitFullscreen(); }
+        }
+        const content = document.getElementById('content');
+        document.addEventListener('keydown', (e) => {if (e.key === 'Enter') { toggleFullScreen(content); }});
+    </script>
+</body>
+</html>
