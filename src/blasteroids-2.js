@@ -8,7 +8,7 @@ const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
 const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-const BUILD = '2024.01.19.10'; // makes it easier to check for cached version on mobile
+const BUILD = '2024.01.19.11'; // makes it easier to check for cached version on mobile
 
 // mobile settings
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
@@ -26,6 +26,7 @@ if (MOBILE) {
 // game settings
 const FPS = 60
 const TIME_STEP = 1000 / FPS;
+const START_KEY = 'Enter';
 const SHAPE_FILL = '#000';
 const LINE_COLOR = '#FFF';
 const FONT_SIZE = MOBILE ? 45 : 30;
@@ -718,9 +719,9 @@ class Game {
     this.longPress = null;
   }
   _handleKeyInput = (event) => {
-    if (!this.gameOver && event.key === 'Escape'){
+    if (!this.gameOver && event.key === START_KEY){
        this.handlePause();
-    } else if (this.gameOver && event.key === 'Escape') {
+    } else if (this.gameOver && event.key === START_KEY) {
       this.newGame();
     } else if (event.key === 'm') {
       GAME_BGM.muted = GAME_BGM && !GAME_BGM.muted;
@@ -836,7 +837,7 @@ class Game {
       this.new ? 'BLASTEROIDS' : 'YOU ARE HERE',
       (MOBILE ? 'TILT' : 'SPACE') + ' TO MOVE',
       (MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-      (MOBILE ? 'HOLD' : 'ESC') + ' TO ' + (this.new ? 'START' : 'RESUME'),
+      (MOBILE ? 'LONG PRESS' : START_KEY.toUpperCase()) + ' TO ' + (this.new ? 'START' : 'RESUME'),
       DEBUG ? BUILD : randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
