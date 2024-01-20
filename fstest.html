@@ -2,22 +2,42 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Full Screen Test</title>
-    <style>
-        #content { max-width: 100%; }
+    <title>Fullscreen Test</title>
+    <style> 
+        html, body { /* https://stackoverflow.com/q/27370973/3178898 */
+            margin:0px;
+            height:100%;
+        }
+        #container {
+            min-height: 100%;
+            min-width: 100%;
+            background-color: black;
+            position: absolute;
+        }
+        #content { /* https://stackoverflow.com/q/13414427/3178898 */
+            /* max-width: 100%; */
+            /* display: block; */
+            width: 100%;
+            height: 100%;
+            /* box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box; */
+            border: 0;
+            position: absolute;
+        }
     </style>
 </head>
 <body>
     <div id="container">
-        <iframe src="./debug.html" id="content"></iframe>
+        <iframe src="./debug.html" id="content" allowfullscreen></iframe>
     </div>
-    <script> // fullscreen on enter
-        function toggleFullScreen(element) {
+    <script> // fullscreen must be initiated by the user
+        function setFullScreen(element) {
             if (!document.fullscreenElement) { element.requestFullscreen(); }
-            else if (document.exitFullscreen) { document.exitFullscreen(); }
+            // else if (document.exitFullscreen) { document.exitFullscreen(); }
         }
         const content = document.getElementById('content');
-        document.addEventListener('keydown', (e) => {if (e.key === 'Enter') { toggleFullScreen(content); }});
+        document.addEventListener('keydown', (e) => {if (e.key === 'Enter') { setFullScreen(content); }});
     </script>
 </body>
 </html>
