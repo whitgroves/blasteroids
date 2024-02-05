@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>blasteroids.io</title>
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <style>
+        * { background-color: black; }
+        html, body { margin: 0; height: 100%; }
+        #game-container { min-width: 100%; min-height: 100%; position: absolute; }
+        #game-content { width: 50%; height: 50%; left: 25%; top: 25%; border: 1; position: absolute; }
+    </style>
+</head>
+<body>
+    <div id="game-container"><iframe src="./game.html" id="game-content" allowfullscreen></iframe></div>
+    <script>
+        const GAME = document.getElementById('game-content');
+        // addEventListener('keydown', event => { if (!document.fullscreenElement) GAME.requestFullscreen().catch(err => {}) });
+    </script>
+</body>
+</html>
