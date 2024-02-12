@@ -1,8 +1,8 @@
-export const canvas = document.getElementById('mainCanvas');
+export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
-export const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.05.0';
+export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
+export const BUILD = '2024.02.11';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {

@@ -1,28 +1,7 @@
 import * as utils from "./utils.js";
 import { Player, Asteroid, BigAsteroid, Comet, UFO, Upgrade } from "./gameobject.js";
 
-console.log("Game audio used courtesy of freesound.org and the respective artists. \
-For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
-
-const handleFullscreen = (event) => {
-  if (!document.fullscreenElement) {
-    utils.canvas.requestFullscreen(); //.catch(err => {})
-    utils.resizeCanvas();
-    utils.safeToggleAudio(utils.TITLE_BGM, 'playOnly');
-    setTimeout(game.createBgStars, 100); // screen needs time to finish resizing
-  }
-  removeEventListener('click', handleFullscreen);
-}
-addEventListener('click', handleFullscreen);
-addEventListener('fullscreenchange', (event) => {
-  if (!document.fullscreenElement) {
-    addEventListener('click', handleFullscreen);
-    utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
-    if (game && !game.paused) game.handlePause();
-  }
-});
-
-class Game {
+export class Game {
   constructor() {
     // utils.safePlayAudio(utils.TITLE_BGM);
     this.new = true; // flag for game start text on first arrival
@@ -321,5 +300,3 @@ class Game {
     requestAnimationFrame(this.run);
   }
 }
-
-let game = new Game();
