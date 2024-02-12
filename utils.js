@@ -180,12 +180,13 @@ export const safePlayAudio = (audio) => {
     audio.play(); // TODO: tie this into the fullscreen popup
   }
 }
-export const safeToggleAudio = (audio) => {
+export const safeToggleAudio = (audio, mode='auto') => {
   if (audio) {
-    if (audio.paused) {
+    if (audio.paused && mode !== 'pauseOnly') { 
+      if (audio.ended) audio.currentTime = 0;
       audio.play();
     }
-    else { audio.pause(); }
+    else if (mode !== 'playOnly') { audio.pause() }
   }
 }
 

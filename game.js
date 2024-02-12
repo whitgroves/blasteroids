@@ -3,18 +3,30 @@ import * as utils from "./utils.js";
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
-const handleFullscreen = (event) => { 
+// const USER_CONFIG = document.cookie.split(";");
+// const safeGetSetting = (settingName) => {
+//   let setting = USER_CONFIG.find((configSetting) => configSetting.startsWith(settingName));
+//   return setting ? setting.split("=")[1] : "";
+// }
+// let newUser = (safeGetSetting("new_user") !== "false");
+
+const handleFullscreen = (event) => {
   if (!document.fullscreenElement) {
     utils.canvas.requestFullscreen(); //.catch(err => {})
     utils.resizeCanvas();
-    if (utils.TITLE_BGM.paused) utils.safePlayAudio(utils.TITLE_BGM);
-    setTimeout(game.createBgStars, 100); 
+    utils.safeToggleAudio(utils.TITLE_BGM, 'playOnly');
+    setTimeout(game.createBgStars, 100); // screen needs time to finish resizing
   }
   removeEventListener('click', handleFullscreen);
-} 
-
+}
 addEventListener('click', handleFullscreen);
-addEventListener('fullscreenchange', event => { if (!document.fullscreenElement) addEventListener('click', handleFullscreen) });
+addEventListener('fullscreenchange', (event) => {
+  if (!document.fullscreenElement) {
+    addEventListener('click', handleFullscreen);
+    utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
+    // TODO: pause game
+  }
+});
 
 class GameObject {
   constructor(game, loc=null, vel=null, radius=1, theta=0) {
