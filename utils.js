@@ -4,6 +4,13 @@ export const ctx = canvas.getContext('2d');
 export const DEBUG = JSON.parse(document.getElementById('debugFlag').text).isDebug;
 export const BUILD = '2024.02.05.0';
 
+// const USER_CONFIG = document.cookie.split(";");
+// const safeGetSetting = (settingName) => {
+//   let setting = USER_CONFIG.find((configSetting) => configSetting.startsWith(settingName));
+//   return setting ? setting.split("=")[1] : "";
+// }
+// let newUser = (safeGetSetting("new_user") !== "false");
+
 // mobile settings
 export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 export const DTAP_TIMEOUT = 300;
@@ -20,7 +27,7 @@ if (MOBILE) {
 // game settings
 export const FPS = 60
 export const TIME_STEP = 1000 / FPS;
-export const START_KEY = 'Enter';
+// export const START_KEY = 'Enter';
 export const SHAPE_FILL = '#000';
 export const LINE_COLOR = '#FFF';
 export const FONT_SIZE = MOBILE ? 45 : 30;
