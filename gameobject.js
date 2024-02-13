@@ -331,7 +331,7 @@ export class UFO extends Hazard {
   _fire = () => {
     if (this._getActiveState()) {
       if (!this.game.paused) { // fire blanks while paused
-        utils.safePlayAudio(UFO_SFX_1);
+        utils.safePlayAudio(utils.UFO_SFX_1);
         new EnemyProjectile(this.game, this.loc, this.theta);
       } // but keep recursing so pattern continues on resume
       this._trigger = setTimeout(this._fire, this._getFireRate());
