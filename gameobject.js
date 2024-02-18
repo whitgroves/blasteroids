@@ -104,7 +104,7 @@ export class Player extends GameObject {
     this.boosting = false;
     this.tilt = new utils.Vector2(); // track device tilt on utils.MOBILE to trigger movement 
     this.neutral = utils.MOBILE ? new utils.Vector2(0, 22) : null; // neutral position for tilt movement
-    this.registerInputs(); // TODO: move so it's managed entirely within Game (priority -1)
+    // this.registerInputs(); // tried moving into Game class, but this one's al dente
     this.weapon = new PlayerWeapon();
     this.color = utils.PLAYER_C;
     new ParticleTrailAnimation(game, this, null, 8, () => { return this.boosting || this._isTilted() });
@@ -139,34 +139,35 @@ export class Player extends GameObject {
     this.firing = true;
   }
   _onDeviceOrientation = (event) => {
-    let beta = Math.max(-90, Math.min(event.beta, 90)); // [-180, 180) -> clamp to [-90, 90)
-    let gamma = event.gamma; // [-90, 90)
-    let screenOrientation = screen.orientation.type;
-    let x = 0;
-    let y = 0;
-    switch (screenOrientation) {
-      // case 'portrait-primary':
-      //   x = gamma;
-      //   y = beta;
-      //   break;
-      case 'landscape-primary':
-        x = beta;
-        y = -gamma;
-        break;
-      case 'landscape-secondary':
-        x = -beta;
-        y = gamma;
-        break;
-    }
-    this.tilt = new utils.Vector2(x, y);
-    if (!this.neutral) this.neutral = this.tilt.copy(); // remember neutral position if one isn't set
-    if (lastOrientation != screenOrientation) {
-      lastOrientation = screenOrientation;
-      if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
-      utils.resizeCanvas();                                 // adjust for new dims
-      this.game.createBgStars();                      // stars need to be redrawn because of new dims
-      // if (this.game.new) setTimeout(() => this.loc.update(utils.canvas.width*0.5, utils.canvas.height*0.5), 100);
-      // if (utils.DEBUG) alert('x:'+utils.canvas.width.toFixed(2)+' y:'+utils.canvas.height.toFixed(2));
+    // let screenOrientation = screen.orientation.type;
+    // if (lastOrientation != screenOrientation) { // if orientation flips, pause the game 
+    //   lastOrientation = screenOrientation;
+    //   if (!this.game.paused) this.game.handlePause();
+    //   // utils.resizeCanvas();                           // adjust for new dims -- not needed since always landscape now
+    //   // this.game.createBgStars();                      // stars need to be redrawn because of new dims
+    //   if (utils.DEBUG) alert("Screen orientation change");
+    // }
+    if (!this.game.paused) {
+      let beta = Math.max(-90, Math.min(event.beta, 90)); // [-180, 180) -> clamp to [-90, 90)
+      let gamma = event.gamma; // [-90, 90)    
+      let x = 0;
+      let y = 0;
+      switch (screen.orientation.type) {
+        // case 'portrait-primary':
+        //   x = gamma;
+        //   y = beta;
+        //   break;
+        case 'landscape-primary':
+          x = beta;
+          y = -gamma;
+          break;
+        case 'landscape-secondary':
+          x = -beta;
+          y = gamma;
+          break;
+      }
+      this.tilt = new utils.Vector2(x, y);
+      if (!this.neutral) this.neutral = this.tilt.copy(); // remember neutral position if it's been reset
     }
   }
   _onMouseMove = (event) => { this.target = new utils.Vector2(event.x, event.y) }
@@ -305,7 +306,7 @@ export class Comet extends Asteroid {
   _onDestroyHazard = () => { if (this.inBounds()) { this.value = 7; } }
   _onUpdate = () => {
     this.theta += this._turnAmt;
-    this.vel.set(Math.cos(this.theta), Math.sin(this.theta), utils.COMET_V);
+    this.vel.update(Math.cos(this.theta), Math.sin(this.theta), utils.COMET_V);
   }
 }
 
@@ -353,7 +354,7 @@ export class UFO extends Hazard {
       let newTheta = Math.atan2(this.game.player.loc.y-this.loc.y, this.game.player.loc.x-this.loc.x);
       let dt = newTheta - this.theta;
       if (Math.abs(dt) > Math.PI/4) this.theta += 0.05 * dt;
-      this.vel.set(Math.cos(this.theta), Math.sin(this.theta), utils.UFO_V);
+      this.vel.update(Math.cos(this.theta), Math.sin(this.theta), utils.UFO_V);
       this._chaseFrames += 1;
       if (utils.UFO_SFX_0.ended) { utils.safePlayAudio(utils.UFO_SFX_0); }
     }

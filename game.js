@@ -19,7 +19,7 @@ export class Game {
   }
   _handleTouchStart = (event) => {
     event.preventDefault(); // block resize on double-tap
-    if (!this.longPress) this.longPress = setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
+    if (!this.longPress) this.longPress = this.longPress || setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, utils.DTAP_TIMEOUT);
@@ -54,20 +54,22 @@ export class Game {
       clearTimeout(this.hazardTimer);
       this.pauseTime = Date.now();
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
+      this.player.deregisterInputs();
     } else if (document.fullscreenElement) {
+      this.lastTick += (Date.now() - this.pauseTime);
       if (this.new) {
-        this.player.loc.x = utils.canvas.width*0.5;
-        this.player.loc.y = utils.canvas.height*0.5;
-        if (utils.DEBUG) alert(`w:${utils.canvas.width}, h:${utils.canvas.height}; ${this.player.loc}`);
+        utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
         this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact));
-        utils.TITLE_BGM.muted = true; // explicitly muted over toggle because it's short and may not autoplay
+        // this.player.registerInputs();
+        // setTimeout(this.player.registerInputs, 100);
+        this.new = false;
       } else {
-        this.lastTick += (Date.now() - this.pauseTime);
+        // this.lastTick += (Date.now() - this.pauseTime);
         this.spawnHazard();
       }
       utils.safePlayAudio(utils.PAUSE_SFX);
       utils.safeToggleAudio(utils.GAME_BGM);
-      this.new = false;
+      this.player.registerInputs();
     }
   }
   register = (gameObj) => {
@@ -101,9 +103,10 @@ export class Game {
     this.createBgStars();
     if (this.new) this.handlePause(); 
     else {
-      if (utils.GAME_BGM.paused) utils.safePlayAudio(utils.GAME_BGM); // restart after total fade out
-      utils.GAME_BGM.volume = utils.GAME_BGM_VOL; // reset volume regardless
+      utils.safeToggleAudio(utils.GAME_BGM, 'playOnly'); // restart after total fade out
+      utils.GAME_BGM.volume = utils.GAME_BGM_VOL; // reset volume from fade out
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
+      this.player.registerInputs();
     }
   }
   createBgStars = () => {
@@ -278,25 +281,34 @@ export class Game {
       utils.displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
     if (utils.DEBUG && this.player) {
-      utils.displayText('x:'+this.player.loc.x.toFixed(0), padding, utils.canvas.height-fontSize*2);
-      utils.displayText('y:'+this.player.loc.y.toFixed(0), padding, padding + utils.canvas.height-fontSize);
+      if (utils.MOBILE) {
+        utils.displayText('player.tilt.x:'+this.player.tilt.x.toFixed(2), padding, utils.canvas.height-fontSize*6);
+        utils.displayText('player.tilt.y:'+this.player.tilt.y.toFixed(2), padding, utils.canvas.height-fontSize*5);
+      }
+      utils.displayText('player.vel.x:'+this.player.vel.x.toFixed(1), padding, utils.canvas.height-fontSize*4);
+      utils.displayText('player.vel.y:'+this.player.vel.y.toFixed(1), padding, utils.canvas.height-fontSize*3);
+      utils.displayText('player.loc.x:'+this.player.loc.x.toFixed(0), padding, utils.canvas.height-fontSize*2);
+      utils.displayText('player.loc.y:'+this.player.loc.y.toFixed(0), padding, utils.canvas.height-fontSize); 
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
-      if (!this.paused && !this.new) {
+      if (!this.paused) {
         this.deltaTime += timestamp - this.lastTick;
         this.lastTick = timestamp;
         var updatesThisLoop = 0;
         while (this.deltaTime >= utils.TIME_STEP) {
           this.update();
           this.deltaTime -= utils.TIME_STEP;
-          if (++updatesThisLoop > 251) { // if updates are taking too long, panic and bail
+          if (++updatesThisLoop > 100) { // if updates are taking too long, panic and bail
             console.log('...at the disco');
             this.deltaTime = 0;
             break;
           }
         }
+      } else if (this.new) { // resolves bug where player would start at a corner/edge instead of mid-screen
+        this.player.loc.update(utils.canvas.width, utils.canvas.height, 0.5);
+        if (utils.MOBILE) this.player.tilt = this.player.neutral.copy();
       }
       this.cleanup();
       this.render();
