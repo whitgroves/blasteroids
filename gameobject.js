@@ -90,6 +90,7 @@ export class PlayerWeapon {
   }
 }
 
+let lastOrientation = screen.orientation.type;
 export class Player extends GameObject {
   constructor(game) {
     utils.resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
@@ -144,10 +145,10 @@ export class Player extends GameObject {
     let x = 0;
     let y = 0;
     switch (screenOrientation) {
-      case 'portrait-primary':
-        x = gamma;
-        y = beta;
-        break;
+      // case 'portrait-primary':
+      //   x = gamma;
+      //   y = beta;
+      //   break;
       case 'landscape-primary':
         x = beta;
         y = -gamma;
@@ -164,6 +165,7 @@ export class Player extends GameObject {
       if (!this.game.paused) this.game.handlePause(); // if the orientation changed, pause the game
       utils.resizeCanvas();                                 // adjust for new dims
       this.game.createBgStars();                      // stars need to be redrawn because of new dims
+      // if (this.game.new) setTimeout(() => this.loc.update(utils.canvas.width*0.5, utils.canvas.height*0.5), 100);
       // if (utils.DEBUG) alert('x:'+utils.canvas.width.toFixed(2)+' y:'+utils.canvas.height.toFixed(2));
     }
   }
@@ -203,7 +205,7 @@ export class Player extends GameObject {
     // apply velocity    
     if (utils.MOBILE && this._isTilted()) { // https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Orientation_and_motion_data_explained
       this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * utils.getScale()); // scale by 1/90 to normalize raw tilt input
-    } 
+    }
     if (!utils.MOBILE && this.boosting) this.vel.add(Math.cos(this.theta), Math.sin(this.theta), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, utils.canvas.width));

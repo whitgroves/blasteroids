@@ -14,7 +14,7 @@ export class Game {
     } else {
       window.addEventListener('keydown', this._handleKeyInput);
     }
-    this.newGame();
+    this.newGame(); // possible bug
     requestAnimationFrame(this.run);
   }
   _handleTouchStart = (event) => {
@@ -44,8 +44,9 @@ export class Game {
     }
   }
   handlePause = () => {
-    this.paused = !this.paused;
-    if (this.paused) {
+    let alreadyPaused = this.paused;
+    this.paused = !this.paused || !document.fullscreenElement;
+    if (this.paused && !alreadyPaused) {
       if (!this.new) { // the very first call should be silent
         utils.safePlayAudio(utils.PAUSE_SFX);
         utils.safeToggleAudio(utils.GAME_BGM);
@@ -53,8 +54,11 @@ export class Game {
       clearTimeout(this.hazardTimer);
       this.pauseTime = Date.now();
       this.pauseText = this.createPauseText(); // it has a random message so we generate each time
-    } else {
-      if (this.new) { 
+    } else if (document.fullscreenElement) {
+      if (this.new) {
+        this.player.loc.x = utils.canvas.width*0.5;
+        this.player.loc.y = utils.canvas.height*0.5;
+        if (utils.DEBUG) alert(`w:${utils.canvas.width}, h:${utils.canvas.height}; ${this.player.loc}`);
         this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact));
         utils.TITLE_BGM.muted = true; // explicitly muted over toggle because it's short and may not autoplay
       } else {
@@ -76,7 +80,7 @@ export class Game {
     this.cleanupIds = [];
   }
   newGame = () => {
-    if (this.jingle && !this.jingle.paused) { utils.safeToggleAudio(this.jingle); } // stop rank jingle ASAP on early reset
+    if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
     utils.resizeCanvas(); // covering all bases
     this.deltaTime = 0;
     this.paused = false;
@@ -95,9 +99,9 @@ export class Game {
     this.timeToImpact = this.new ? 3000 : 2000;
     this.upgradeInPlay = false;
     this.createBgStars();
-    if (this.new) { this.handlePause(); } // start in paused state so new users can see control scheme
+    if (this.new) this.handlePause(); 
     else {
-      if (utils.GAME_BGM.paused) { utils.safePlayAudio(utils.GAME_BGM); } // restart after total fade out
+      if (utils.GAME_BGM.paused) utils.safePlayAudio(utils.GAME_BGM); // restart after total fade out
       utils.GAME_BGM.volume = utils.GAME_BGM_VOL; // reset volume regardless
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
@@ -273,14 +277,14 @@ export class Game {
       }
       utils.displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
     }
-    if (utils.DEBUG && this.player.tilt) {
-      utils.displayText('x:'+this.player.tilt.x.toFixed(2), padding, utils.canvas.height-fontSize*2);
-      utils.displayText('y:'+this.player.tilt.y.toFixed(2), padding, padding + utils.canvas.height-fontSize);
+    if (utils.DEBUG && this.player) {
+      utils.displayText('x:'+this.player.loc.x.toFixed(0), padding, utils.canvas.height-fontSize*2);
+      utils.displayText('y:'+this.player.loc.y.toFixed(0), padding, padding + utils.canvas.height-fontSize);
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
-      if (!this.paused) {
+      if (!this.paused && !this.new) {
         this.deltaTime += timestamp - this.lastTick;
         this.lastTick = timestamp;
         var updatesThisLoop = 0;
@@ -297,7 +301,7 @@ export class Game {
       this.cleanup();
       this.render();
     } catch (e) {
-      alert(e);
+      if (utils.DEBUG) alert(e);
     } finally {
       requestAnimationFrame(this.run);
     }

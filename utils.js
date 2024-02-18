@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.11';
+export const BUILD = '2024.02.17';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -17,17 +17,11 @@ export const DTAP_TIMEOUT = 300;
 export const LTAP_TIMEOUT = 500; // how long to wait for a long press
 export const TILT_THRESH = 3;
 
-let lastOrientation = screen.orientation.type;
-if (MOBILE) {
-  if (DEBUG) {addEventListener('error', (e) => { alert('Error: Ln: '+e.lineno+', Col: '+e.colno+': '+e.message); }); }
-  // screen.orientation.lock('landscape');
-  // document.body.requestFullscreen(); // fails if not called by UI element or orientation change // https://stackoverflow.com/q/62561844/3178898
-}
+if (MOBILE && DEBUG) addEventListener('error', (e) => alert('Error: Ln: '+e.lineno+', Col: '+e.colno+': '+e.message));
 
 // game settings
 export const FPS = 60
 export const TIME_STEP = 1000 / FPS;
-// export const START_KEY = 'Enter';
 export const SHAPE_FILL = '#000';
 export const LINE_COLOR = '#FFF';
 export const FONT_SIZE = MOBILE ? 45 : 30;
@@ -119,8 +113,8 @@ export const UFO_SFX_1 = document.getElementById('ufoSfx_1');
 UFO_SFX_1.volume = .5;
 
 // display
-export const getScale = () => { return !MOBILE ? 1 : lastOrientation == 'portrait-primary' ? 0.8 : 0.35 }
-export const getLineWidth = () => { return (!MOBILE ? 2 : lastOrientation == 'portrait-primary' ? 3 : 2.5) }
+export const getScale = () => { return !MOBILE ? 1 : 0.35 };
+export const getLineWidth = () => { return (!MOBILE ? 2 : 2.5) };
 export const getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 export const resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
@@ -216,9 +210,9 @@ export const randomSpawn = () => { // generates a random spawn point on the edge
 
 export class Vector2 { // I know libraries for this exist but sometimes you want a scoop of vanilla
   constructor(x=0, y=0, scale=1) {
-    this.set(x, y, scale);
+    this.update(x, y, scale);
   }
-  set = (x, y, scale=1) => {
+  update = (x, y, scale=1) => {
     this.x = x * scale;
     this.y = y * scale;
   }
@@ -231,4 +225,5 @@ export class Vector2 { // I know libraries for this exist but sometimes you want
     this.y = func(this.y);
   }
   copy = (scale=1) => { return new Vector2(this.x, this.y, scale) } // TIL JS is sometimes pass by reference
+  toString = () => { return `x:${this.x}, y:${this.y}`} // override for easier debug
 }

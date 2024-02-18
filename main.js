@@ -7,7 +7,9 @@ For detailed attribution, view the README at https://github.com/whitgroves/blast
 const userEvent = utils.MOBILE ? 'touchend' : 'click';
 const handleFullscreen = (event) => {
   if (!document.fullscreenElement) {
-    utils.canvas.requestFullscreen().catch(err => console.log(err));
+    utils.canvas.requestFullscreen()
+      .then(() => {if (utils.MOBILE) screen.orientation.lock('landscape')})
+      .catch(err => utils.MOBILE ? alert(err) : console.log(err));
     utils.resizeCanvas();
     utils.safeToggleAudio(utils.TITLE_BGM, 'playOnly');
     setTimeout(game.createBgStars, 100); // screen needs time to finish resizing
@@ -21,6 +23,7 @@ addEventListener('fullscreenchange', (event) => {
     utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
     if (game && !game.paused) game.handlePause();
   }
+  
 });
 
 let game = new Game();
