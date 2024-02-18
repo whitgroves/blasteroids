@@ -1,29 +1,26 @@
 import * as utils from "./utils.js";
+import { Game } from "./game.js";
 
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
-// load sfx
-const TITLE_BGM = new Audio("./sfx/368770__furbyguy__8-bit-bass-lead.wav");
-TITLE_BGM.volume = .3;
-
-// attach one-time listener to handle fullscreen resize and then detach itself
+const userEvent = utils.MOBILE ? 'touchend' : 'click';
 const handleFullscreen = (event) => {
   if (!document.fullscreenElement) {
-    utils.canvas.requestFullscreen(); //.catch(err => {})
+    utils.canvas.requestFullscreen().catch(err => console.log(err));
     utils.resizeCanvas();
-    utils.safeToggleAudio(TITLE_BGM, 'playOnly');
+    utils.safeToggleAudio(utils.TITLE_BGM, 'playOnly');
+    setTimeout(game.createBgStars, 100); // screen needs time to finish resizing
   }
-  utils.canvas.removeEventListener('click', handleFullscreen);
+  utils.canvas.removeEventListener(userEvent, handleFullscreen);
 }
-utils.canvas.addEventListener('click', handleFullscreen);
-
-// reattach listener if fullscreen is lost
+utils.canvas.addEventListener(userEvent, handleFullscreen);
 addEventListener('fullscreenchange', (event) => {
   if (!document.fullscreenElement) {
-    utils.canvas.addEventListener('click', handleFullscreen);
-    utils.safeToggleAudio(TITLE_BGM, 'pauseOnly');
+    utils.canvas.addEventListener(userEvent, handleFullscreen);
+    utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
+    if (game && !game.paused) game.handlePause();
   }
 });
 
-// let game = new Game();
+let game = new Game();
