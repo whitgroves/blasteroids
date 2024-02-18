@@ -8,7 +8,7 @@
         * { background-color: black; }
         html, body { margin: 0; height: 100%; }
         #game-container { min-width: 100%; min-height: 100%; position: absolute; }
-        #game-content { width: 80%; height: 80%; left: 10%; top: 10%; border: 1; position: absolute; background-color: black;}
+        #game-content { width: 66%; height: 66%; left: 17%; top: 17%; border: 1px solid gray; position: absolute; background-color: black;}
     </style>
     <!-- to play locally run `py -m http.server` -->
     <audio id="weaponSfx" src="./sfx/257232__javierzumer__retro-shot-blaster.wav"></audio>
@@ -30,7 +30,7 @@
     <audio id="rankSfx_A" src="./sfx/270333__littlerobotsoundfactory__jingle_win_00.wav"></audio>
     <audio id="rankSfx_S" src="./sfx/256143__jmayoff__dancy.wav"></audio>
 </head>
-<body> 
+<body>
     <div id="game-container"><canvas id="game-content"></canvas></div>
     <script src="./main.js" type="module"></script>
 </body>

@@ -90,7 +90,6 @@ export class PlayerWeapon {
   }
 }
 
-let lastOrientation = screen.orientation.type;
 export class Player extends GameObject {
   constructor(game) {
     utils.resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
@@ -104,7 +103,6 @@ export class Player extends GameObject {
     this.boosting = false;
     this.tilt = new utils.Vector2(); // track device tilt on utils.MOBILE to trigger movement 
     this.neutral = utils.MOBILE ? new utils.Vector2(0, 22) : null; // neutral position for tilt movement
-    // this.registerInputs(); // tried moving into Game class, but this one's al dente
     this.weapon = new PlayerWeapon();
     this.color = utils.PLAYER_C;
     new ParticleTrailAnimation(game, this, null, 8, () => { return this.boosting || this._isTilted() });
@@ -139,24 +137,12 @@ export class Player extends GameObject {
     this.firing = true;
   }
   _onDeviceOrientation = (event) => {
-    // let screenOrientation = screen.orientation.type;
-    // if (lastOrientation != screenOrientation) { // if orientation flips, pause the game 
-    //   lastOrientation = screenOrientation;
-    //   if (!this.game.paused) this.game.handlePause();
-    //   // utils.resizeCanvas();                           // adjust for new dims -- not needed since always landscape now
-    //   // this.game.createBgStars();                      // stars need to be redrawn because of new dims
-    //   if (utils.DEBUG) alert("Screen orientation change");
-    // }
     if (!this.game.paused) {
       let beta = Math.max(-90, Math.min(event.beta, 90)); // [-180, 180) -> clamp to [-90, 90)
       let gamma = event.gamma; // [-90, 90)    
       let x = 0;
       let y = 0;
       switch (screen.orientation.type) {
-        // case 'portrait-primary':
-        //   x = gamma;
-        //   y = beta;
-        //   break;
         case 'landscape-primary':
           x = beta;
           y = -gamma;
@@ -181,6 +167,7 @@ export class Player extends GameObject {
     // new ExplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius()*10);
     // BUG: the game doesn't update in the game over state, so this^ animation never plays (WONTFIX)
   }
+  _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius()*10); }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > utils.TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > utils.TILT_THRESH}
   _safeUpdateVelocity = (v) => {
     v *= (1 - this.frict);
@@ -283,7 +270,7 @@ export class Upgrade extends Hazard { // not really a hazard but behavior is 90%
     }
     setTimeout(() => { this.game.upgradeInPlay = false }, utils.randomVal(5000, 10000)); // if missed, wait 5-10s to respawn
   }
-  _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius() * 5)}
+  _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius()*3)}
   render = () => {
     utils.tracePoints(this._points(this.shape), this.shape, this.color, this.colorGradient[this.gradientIndex]);
     if (this.gradientIndex <= 0 || this.gradientIndex >= this.colorGradient.length) { this.gradientStep *= -1; }
@@ -315,6 +302,7 @@ export class EnemyProjectile extends Hazard {
     super(game, loc, utils.PROJ_V, theta, game.player.getRadius(), null, utils.UFO_C, 1); // player radius used for collision
   }
   _points = () => { return [this.loc, new utils.Vector2(this.loc.x-this.vel.x*utils.PROJ_L, this.loc.y-this.vel.y*utils.PROJ_L)]; }
+  _onDestroyAnimate = () => { new ImplosionAnimation(this.game, this.loc, this.color, utils.PROJ_L); }
 }
 
 export class UFO extends Hazard {
@@ -340,7 +328,7 @@ export class UFO extends Hazard {
       this._trigger = setTimeout(this._fire, this._getFireRate());
     }
   }
-  _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius()*5); }
+  _onDestroyAnimate = () => { new ImplosionAnimation(this.game, this.loc, this.color, this.getRadius()); }
   _onDestroyHazard = () => {
     clearTimeout(this._trigger); // ceasefire
     utils.UFO_SFX_0.muted = true; // stop engine noise until next UFO spawns
@@ -408,6 +396,10 @@ export class ExplosionAnimation extends GameObject {
 }
 
 export class ImplosionAnimation extends ExplosionAnimation {
+  constructor(game, loc, color, maxRadius) {
+    super(game, loc, color, maxRadius);
+    this.waveDensity = 10;
+  }
   render = () => {
     for (let i = 0; i < this.waves.length; i++) {
       let waveRadius = ((this.maxFrames - i) / this.maxFrames) * this.maxRadius;
@@ -417,6 +409,11 @@ export class ImplosionAnimation extends ExplosionAnimation {
 }
 
 export class ImpactRingAnimation extends ExplosionAnimation {
+  constructor(game, loc, color, maxRadius) {
+    super(game, loc, color, maxRadius);
+    // this.maxFrames = utils.FPS;
+    this.waveDensity = 10;
+  }
   render = () => {
     for (let i = 0; i < this.waves.length; i++) {
       let waveRadius = (this.currentFrame / this.maxFrames) * this.maxRadius;

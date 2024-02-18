@@ -10,8 +10,10 @@ const userEvent = utils.MOBILE ? 'touchend' : 'click';
 const handleFullscreen = (event) => {
   if (!document.fullscreenElement) {
     utils.canvas.requestFullscreen()
-      .then(() => {if (utils.MOBILE) screen.orientation.lock('landscape')})
-      .catch(err => utils.MOBILE ? alert(err) : console.log(err));
+      .then(() => {
+        if (utils.MOBILE) screen.orientation.lock('landscape');
+        utils.canvas.style.borderWidth = "0px";
+      }).catch(err => utils.MOBILE ? alert(err) : console.log(err));
     utils.resizeCanvas();
     if (game.new) utils.safeToggleAudio(utils.TITLE_BGM, 'playOnly');
     setTimeout(game.createBgStars, 100); // screen needs time to finish resizing
@@ -25,6 +27,7 @@ addEventListener('fullscreenchange', (event) => {
     utils.canvas.addEventListener(userEvent, handleFullscreen);
     utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
     if (!game.paused && !game.gameOver) game.handlePause();
+    utils.canvas.style.borderWidth = "1px";
   }
 });
 

@@ -158,7 +158,7 @@ export class Game {
       this.new ? 'BLASTEROIDS' : 'GAME PAUSED',
       (utils.MOBILE ? 'TILT' : 'SPACE') + ' TO BOOST',
       (utils.MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
-      (utils.MOBILE ? 'PRESS' : 'ENTER') + ' TO ' + (this.new ? 'START' : 'RESUME'),
+      (utils.MOBILE ? 'HOLD' : 'ENTER') + ' TO ' + (this.new ? 'START' : 'RESUME'),
       utils.DEBUG ? utils.BUILD : utils.randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
@@ -208,11 +208,11 @@ export class Game {
     this.gameOverText = [
       'GAME OVER',
       'SCORE: '+this.score,
-      // 'ACC  : '+(this.shots > 0 ? 100*this.hits/this.shots : 0).toFixed(1)+'%',
+      'ACC  : '+(this.shots > 0 ? (100*this.hits/this.shots).toFixed(1)+'%' : this.score >= 30 ? '∞' : 'N/A'),
       'RANK : '+this.rank,
       utils.randomChoice(commentPool), //comment,
       'THANKS FOR PLAYING',
-      (utils.MOBILE ? 'PRESS' : 'ENTER') + ' FOR NEW GAME'
+      (utils.MOBILE ? 'HOLD' : 'ENTER') + ' FOR NEW GAME'
     ]
   }
   update = () => {
@@ -244,7 +244,10 @@ export class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 5 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
-    if (!this.new) utils.displayText(this.score, padding, padding + fontSize);
+    if (!this.new) {
+      utils.displayText(`SCORE`, padding, padding+fontSize);
+      utils.displayText(this.score, padding, padding+fontSize*2);
+    }
     if (this.paused) {
       if (!this.pauseText) this.createPauseText();
       utils.displayTextBox(this.pauseText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
@@ -278,7 +281,7 @@ export class Game {
         utils.GAME_BGM.volume = 0;
         utils.safeToggleAudio(utils.GAME_BGM); // after full fade out, pause flag is used to restart bgm
       }
-      utils.displayTextBox(this.gameOverText, this.player.loc.x, this.player.loc.y);
+      utils.displayTextBox(this.gameOverText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);// this.player.loc.x, this.player.loc.y);
     }
     if (utils.DEBUG && this.player) {
       if (utils.MOBILE) {
