@@ -24,7 +24,14 @@ utils.canvas.addEventListener(userEvent, handleFullscreen);
 
 const handleScreenChange = () => {
   // utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
-  if (game.gameOver) utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly');
+  if (game.gameOver) {
+    utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly');
+    utils.safeToggleAudio(utils.JINGLE_RANK_D, 'pauseOnly');
+    utils.safeToggleAudio(utils.JINGLE_RANK_C, 'pauseOnly');
+    utils.safeToggleAudio(utils.JINGLE_RANK_B, 'pauseOnly');
+    utils.safeToggleAudio(utils.JINGLE_RANK_A, 'pauseOnly');
+    utils.safeToggleAudio(utils.JINGLE_RANK_S, 'pauseOnly');
+  }
   else if (!game.paused) game.handlePause();
 }
 

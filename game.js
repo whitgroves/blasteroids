@@ -19,7 +19,9 @@ export class Game {
   }
   _handleTouchStart = (event) => {
     event.preventDefault(); // block resize on double-tap
-    if (!this.longPress) this.longPress = this.longPress || setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
+    this.lastTapTime = Date.now();
+    this.lastTap = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
+    this.longPress = this.longPress || setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, utils.DTAP_TIMEOUT);
@@ -33,6 +35,8 @@ export class Game {
     event.preventDefault();
     clearTimeout(this.longPress);
     this.longPress = null;
+    this.lastTap = null;
+    this.lastTapTime = null;
   }
   _handleKeyInput = (event) => {
     if (!this.gameOver && event.key === "Enter") {
@@ -244,10 +248,8 @@ export class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 5 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
-    // if (!this.new) {
-      utils.displayText(`SCORE`, padding, padding+fontSize);
-      utils.displayText(this.score, padding, padding+fontSize*2);
-    // }
+    utils.displayText(`SCORE`, padding, padding+fontSize);
+    utils.displayText(this.score, padding, padding+fontSize*2);
     if (this.paused) {
       if (!this.pauseText) this.createPauseText();
       utils.displayTextBox(this.pauseText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
@@ -292,6 +294,14 @@ export class Game {
       utils.displayText('player.vel.y:'+this.player.vel.y.toFixed(1), padding, utils.canvas.height-fontSize*3);
       utils.displayText('player.loc.x:'+this.player.loc.x.toFixed(0), padding, utils.canvas.height-fontSize*2);
       utils.displayText('player.loc.y:'+this.player.loc.y.toFixed(0), padding, utils.canvas.height-fontSize); 
+    }
+    if (this.longPress) {
+      let timePressed = Date.now() - this.lastTapTime;
+      if (timePressed > 100 && timePressed < utils.LTAP_TIMEOUT) {
+        let pressPct = timePressed/utils.LTAP_TIMEOUT;
+        let ringColor = utils.fadeColor(utils.LINE_COLOR, pressPct/2);
+        utils.traceRing(this.lastTap.x, this.lastTap.y, 70, ringColor, pressPct);
+      }
     }
   } 
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing

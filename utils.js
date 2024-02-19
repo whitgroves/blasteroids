@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.19.0015';
+export const BUILD = '2024.02.19.0306';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -137,6 +137,13 @@ export const dotPoints = (points, color=LINE_COLOR) => { // points is an array o
   points.forEach(point => { ctx.fillRect(point.x, point.y, getLineWidth(), getLineWidth()) }); // https://stackoverflow.com/a/7813282/3178898
   ctx.fill();
   ctx.closePath();
+}
+export const traceRing = (x, y, radius, color=LINE_COLOR, progress=1.0, ccw=false) => {
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = getLineWidth() * 3;
+  ctx.arc(x, y, radius, 0, (2 * Math.PI * progress), ccw);
+  ctx.stroke();
 }
 export const displayText = (text, x, y, color=LINE_COLOR) => {
   ctx.font = FONT_SIZE * getScale()+'px '+FONT_FAM;
