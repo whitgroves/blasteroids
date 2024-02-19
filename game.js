@@ -23,7 +23,7 @@ export class Game {
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, utils.DTAP_TIMEOUT);
-    } else if (this.paused) { // recalibrate
+    } else if (this.paused && !this.new) { // recalibrate
       this.player.neutral = null; // neutral pos will reset on resume
       utils.safePlayAudio(utils.PAUSE_SFX); // audio cue
       // if (utils.DEBUG) alert('gyroscope will reset on resume');
@@ -244,10 +244,10 @@ export class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 5 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
-    if (!this.new) {
+    // if (!this.new) {
       utils.displayText(`SCORE`, padding, padding+fontSize);
       utils.displayText(this.score, padding, padding+fontSize*2);
-    }
+    // }
     if (this.paused) {
       if (!this.pauseText) this.createPauseText();
       utils.displayTextBox(this.pauseText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);

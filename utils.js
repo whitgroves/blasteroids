@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.18.1653';
+export const BUILD = '2024.02.19.0015';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {

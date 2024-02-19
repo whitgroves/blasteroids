@@ -22,18 +22,31 @@ const handleFullscreen = (event) => {
 }
 utils.canvas.addEventListener(userEvent, handleFullscreen);
 
+const handleScreenChange = () => {
+  // utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
+  if (game.gameOver) utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly');
+  else if (!game.paused) game.handlePause();
+}
+
 addEventListener('fullscreenchange', (event) => {
   if (!document.fullscreenElement) {
     utils.canvas.addEventListener(userEvent, handleFullscreen);
-    utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
-    if (!game.paused && !game.gameOver) game.handlePause();
+    if (game.new) utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
+    handleScreenChange();
     utils.canvas.style.borderWidth = "1px";
   }
 });
 
 screen.orientation.addEventListener('change', (event) => {
   // if (utils.DEBUG) alert(`ScreenOrientation change: ${event.target.type}, ${event.target.angle}`);
-  if (!game.paused && !game.gameOver) game.handlePause();
+  handleScreenChange();
   utils.resizeCanvas();
   game.createBgStars();
-})
+});
+
+addEventListener('visibilitychange', () => {
+  if (document.visibilityState === "hidden") {
+    if (game.new) utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
+    handleScreenChange();
+  }
+});
