@@ -161,9 +161,10 @@ export class Game {
     this.pauseText = [
       this.new ? 'BLASTEROIDS' : 'GAME PAUSED',
       (utils.MOBILE ? 'TILT' : 'SPACE') + ' TO BOOST',
-      (utils.MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT',
+      (utils.MOBILE ? 'TAP ' : 'CLICK') + ' TO SHOOT',
       (utils.MOBILE ? 'HOLD' : 'ENTER') + ' TO ' + (this.new ? 'START' : 'RESUME'),
-      utils.DEBUG ? utils.BUILD : utils.randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
+      utils.DEBUG ? utils.BUILD 
+                  : utils.randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
   rankPlayer = () => {
@@ -246,7 +247,7 @@ export class Game {
       utils.dotPoints(this.bgStars);
     }
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
-    let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 5 : 1);
+    let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 3 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
     utils.displayText(`SCORE`, padding, padding+fontSize);
     utils.displayText(this.score, padding, padding+fontSize*2);
@@ -295,7 +296,7 @@ export class Game {
       utils.displayText('player.loc.x:'+this.player.loc.x.toFixed(0), padding, utils.canvas.height-fontSize*2);
       utils.displayText('player.loc.y:'+this.player.loc.y.toFixed(0), padding, utils.canvas.height-fontSize); 
     }
-    if (this.longPress) {
+    if (document.fullscreenElement && this.longPress) {
       let timePressed = Date.now() - this.lastTapTime;
       if (timePressed > 100 && timePressed < utils.LTAP_TIMEOUT) {
         let pressPct = timePressed/utils.LTAP_TIMEOUT;

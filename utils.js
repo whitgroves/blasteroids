@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.19.0306';
+export const BUILD = '2024.02.20.2113';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -113,7 +113,9 @@ export const UFO_SFX_1 = document.getElementById('ufoSfx_1');
 UFO_SFX_1.volume = .5;
 
 // display
-export const getScale = () => { return !MOBILE ? 1 : 0.35 };
+const baseScale = MOBILE ? 0.35 : 1;
+const miniScale = MOBILE ? 3 : 1.5; // upscale for when game isn't fullscreen
+export const getScale = () => { return baseScale * (document.fullscreenElement ? 1 : miniScale) };
 export const getLineWidth = () => { return (!MOBILE ? 2 : 2.5) };
 export const getWindowStyle = (attribute) => { return window.getComputedStyle(document.body).getPropertyValue(attribute).slice(0, -2) } // returns ~"30px" hence the slice
 export const resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
