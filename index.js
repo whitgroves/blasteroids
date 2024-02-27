@@ -4,6 +4,8 @@ import { Game } from "./game.js";
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
+document.getElementById("intro-text").innerText = `${(utils.MOBILE ? "tap" : "click")} to play — game starts in fullscreen`;
+
 const game = new Game();
 const userEvent = utils.MOBILE ? 'touchend' : 'click';
 

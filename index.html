@@ -3,12 +3,26 @@
 <head>
     <meta charset="utf-8">
     <title>blasteroids.io</title>
-    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="icon" href="./favicon.ico">
     <style>
-        * { background-color: black; }
+        * { background-color: black; color: white; align-items: center; justify-content: center; text-align: center; font-family: monospace; }
+        a { text-decoration: none; color: gray;}
+        a:hover { color: white; }
         html, body { margin: 0; height: 100%; }
-        #game-container { min-width: 100%; min-height: 100%; position: absolute; }
-        #game-content { width: 66%; height: 66%; left: 17%; top: 17%; border: 1px solid gray; position: absolute; background-color: black;}
+        .page-container { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+        .game-container { 
+            /* overflow: hidden; */ /* hides border @ game-content: width: 100% */
+            position: relative;
+            width: 80%; left: 10%;
+            height: 100%; 
+            /* min-height: 100%; */
+            display: flex;
+        }
+        .game-content { 
+            width:  100%;
+            height: 100%;
+            border: 1px solid gray;
+        }
     </style>
     <!-- to play locally run `py -m http.server` -->
     <audio id="weaponSfx" src="./sfx/257232__javierzumer__retro-shot-blaster.wav"></audio>
@@ -31,7 +45,24 @@
     <audio id="rankSfx_S" src="./sfx/256143__jmayoff__dancy.wav"></audio>
 </head>
 <body>
-    <div id="game-container"><canvas id="game-content"></canvas></div>
-    <script src="./main.js" type="module"></script>
+    <div class="page-container">
+        <header>
+            <h1>welcome to blasteroids.io</h1>
+            <p style="font-size: x-large;" id="intro-text">click/tap to play — game starts in fullscreen</p>
+        </header>
+        <div class="game-container">
+            <!-- <iframe id="game-content"></iframe> -->
+            <canvas id="game-content" class="game-content"></canvas>
+        </div>
+        <footer>
+            <!-- <img src="favicon.ico" height="100" width="100"> -->
+            <p><a href="#">privacy policy</a></p>
+        </footer>
+    </div>
+    <script>
+        let introText = document.getElementById("intro-text");
+        introText.innerText = `${(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "tap" : "click")} to play — game starts in fullscreen`;
+    </script>
+    <script src="index.js" type="module"></script>
 </body>
 </html>
