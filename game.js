@@ -310,16 +310,21 @@ export class Game {
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
       if (!this.paused) {
-        this.deltaTime += timestamp - this.lastTick;
-        this.lastTick = timestamp;
-        var updatesThisLoop = 0;
-        while (this.deltaTime >= utils.TIME_STEP) {
-          this.update();
-          this.deltaTime -= utils.TIME_STEP;
-          if (++updatesThisLoop > 100) { // if updates are taking too long, panic and bail
-            console.log('...at the disco');
-            this.deltaTime = 0;
-            break;
+        if (!document.hasFocus()) {
+          if (utils.DEBUG) console.log('lost focus');
+          this.handlePause();
+        } else {
+          this.deltaTime += timestamp - this.lastTick;
+          this.lastTick = timestamp;
+          var updatesThisLoop = 0;
+          while (this.deltaTime >= utils.TIME_STEP) {
+            this.update();
+            this.deltaTime -= utils.TIME_STEP;
+            if (++updatesThisLoop > 100) { // if updates are taking too long, panic and bail
+              console.log('...at the disco');
+              this.deltaTime = 0;
+              break;
+            }
           }
         }
       } else if (this.new) { // resolves bug where player would start at a corner/edge instead of mid-screen
