@@ -9,14 +9,12 @@
         html, body { margin: 0; height: 100%; }
         h1 { font-size: 3rem; }
         p { font-size: 2rem; }
-        a { text-decoration: none; color: gray;}
+        a { text-decoration: none; color: gray; }
+        i { color: lightgray; font-size: 1.8rem;}
+        b { font-size: 2.2rem;}
         a:hover { color: white; }
-        /* header { padding-top: 1vh; }
-        footer { z-index: 99; padding-bottom: 1vh;} */
         .page-container { min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-        /* .page-content { position: relative; width: 80vw; } */
         .page-content { 
-            /* overflow: hidden; */
             display: flex;
             flex-direction: column;
             width:  100%;
@@ -28,22 +26,32 @@
     <div class="page-container">
         <header>
             <h1>privacy policy</h1>
-            <p><i>"I'm just here so I don't get fined." — Marshawn Lynch</i></p>
+            <!-- <p><i>"I'm just here so I don't get fined." — Marshawn Lynch</i></p> -->
+            <i>Last updated Feb 28, 2024</i>
         </header>
         <div class="page-content">
-            <p style="font-size: 2.5rem; padding: min(5vh, 5vw);">
-                blasteroids.io neither collects nor stores users' personal information,
-                although future updates may use cookies to save player settings and statistics.
+            <p style="padding: min(5vh, 5vw);">
+                <b>What we collect</b>
                 <br>
+                We do not collect any personal information directly from users. 
                 <br>
-                however it does use AdSense, which tracks user activity under <a href="https://policies.google.com/privacy" target="_blank">Google's privacy policy</a>.
-                blasteroids.io does not have access to this data.
+                However, third-party ads may collect data for targeted advertising.
+                <br><br>
+                <b>Third-party ads</b>
                 <br>
+                Ads on the site are served by third party networks.
                 <br>
-                by continuing to use this site, you agree to both this policy and theirs.
+                Refer to their privacy policies for more detail:
+                <br>
+                -<a href="https://policies.google.com/privacy">Google AdSense</a>
+                <br><br>
+                <b>Policy changes</b>
+                <br>
+                This policy may be updated periodically.
             </p>
         </div>
         <footer>
+            <img src="favicon.ico" height="64" width="64">
             <p><a href="javascript:window.close();">that's cool, let me play</a></p>
         </footer>
     </div>
