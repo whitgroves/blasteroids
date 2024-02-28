@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>blasteroids.io</title>
+    <link rel="icon" href="./favicon.ico">
+    <style>
+        * { background-color: black; color: white; align-items: center; justify-content: center; text-align: center; font-family: monospace; overflow: hidden; }
+        html, body { margin: 0; height: 100%; }
+        h1 { font-size: 3rem; }
+        p { font-size: 2rem; }
+        a { text-decoration: none; color: gray;}
+        a:hover { color: white; }
+        /* header { padding-top: 1vh; }
+        footer { z-index: 99; padding-bottom: 1vh;} */
+        .page-container { min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+        /* .page-content { position: relative; width: 80vw; } */
+        .page-content { 
+            /* overflow: hidden; */
+            display: flex;
+            flex-direction: column;
+            width:  100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <header>
+            <h1>privacy policy</h1>
+            <p><i>"I'm just here so I don't get fined." — Marshawn Lynch</i></p>
+        </header>
+        <div class="page-content">
+            <p style="font-size: 2.5rem; padding: min(5vh, 5vw);">
+                blasteroids.io neither collects nor stores users' personal information,
+                although future updates may use cookies to save player settings and statistics.
+                <br>
+                <br>
+                however it does use AdSense, which tracks user activity under <a href="https://policies.google.com/privacy" target="_blank">Google's privacy policy</a>.
+                blasteroids.io does not have access to this data.
+                <br>
+                <br>
+                by continuing to use this site, you agree to both this policy and theirs.
+            </p>
+        </div>
+        <footer>
+            <p><a href="javascript:window.close();">that's cool, let me play</a></p>
+        </footer>
+    </div>
+</body>
+</html>

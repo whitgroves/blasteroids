@@ -18,7 +18,7 @@ export class Game {
     requestAnimationFrame(this.run);
   }
   _handleTouchStart = (event) => {
-    event.preventDefault(); // block resize on double-tap
+    // event.preventDefault(); // block resize on double-tap
     this.lastTapTime = Date.now();
     this.lastTap = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.longPress = this.longPress || setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
@@ -32,7 +32,7 @@ export class Game {
     }
   }
   _handleTouchEnd = (event) => { // long press
-    event.preventDefault();
+    // event.preventDefault();
     clearTimeout(this.longPress);
     this.longPress = null;
     this.lastTap = null;
@@ -249,8 +249,10 @@ export class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 3 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
-    utils.displayText(`SCORE`, padding, padding+fontSize);
-    utils.displayText(this.score, padding, padding+fontSize*2);
+    if (!this.new) {
+      utils.displayText(`SCORE`, padding, padding+fontSize);
+      utils.displayText(this.score, padding, padding+fontSize*2);
+    }
     if (this.paused) {
       if (!this.pauseText) this.createPauseText();
       utils.displayTextBox(this.pauseText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
