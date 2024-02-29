@@ -13,6 +13,7 @@ export class Game {
       window.addEventListener('touchend', this._handleTouchEnd);
     } else {
       window.addEventListener('keydown', this._handleKeyInput);
+      window.addEventListener('click', this._handleClick);
     }
     this.newGame(); // possible bug
     requestAnimationFrame(this.run);
@@ -45,6 +46,13 @@ export class Game {
       this.newGame();
     } else if (event.key === 'm') {
       utils.GAME_BGM.muted = utils.GAME_BGM && !utils.GAME_BGM.muted;
+    }
+  }
+
+  _handleClick = (event) => {
+    if (document.fullscreenElement) {
+      if (!this.gameOver && this.paused) this.handlePause();
+      else if (this.canRestart) this.newGame();
     }
   }
 
@@ -181,8 +189,8 @@ export class Game {
       this.new ? 'BLASTEROIDS' : 'GAME PAUSED',
       (utils.MOBILE ? 'TILT' : 'SPACE') + ' TO BOOST',
       (utils.MOBILE ? 'TAP ' : 'CLICK') + ' TO SHOOT',
-      (utils.MOBILE ? 'HOLD' : 'ENTER') + ' TO ' + (this.new ? 'START' : 'RESUME'),
-      utils.DEBUG ? utils.BUILD 
+      (utils.MOBILE ? 'HOLD' : 'ENTER') + ' TO PAUSE',
+      utils.DEBUG ? utils.BUILD
                   : utils.randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
@@ -231,13 +239,12 @@ export class Game {
       }
     }
     this.gameOverText = [
-      'GAME OVER',
+      'THANKS FOR PLAYING',
       'SCORE: '+this.score,
       'ACC  : '+(this.shots > 0 ? (100*this.hits/this.shots).toFixed(1)+'%' : this.score >= 30 ? '∞' : 'N/A'),
       'RANK : '+this.rank,
       utils.randomChoice(commentPool), //comment,
-      'THANKS FOR PLAYING',
-      (utils.MOBILE ? 'HOLD' : 'ENTER') + ' FOR NEW GAME'
+      (utils.MOBILE ? 'HOLD DOWN' : 'ANY INPUT') + ' TO RETRY'
     ]
   }
 
