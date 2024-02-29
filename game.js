@@ -2,6 +2,7 @@ import * as utils from "./utils.js";
 import { Player, Asteroid, BigAsteroid, Comet, UFO, Upgrade } from "./gameobject.js";
 
 export class Game {
+
   constructor() {
     this.new = true; // flag for game start text on first arrival
     this.lastTick = 0; // tracks ms since first arrival for deltaTime
@@ -16,6 +17,7 @@ export class Game {
     this.newGame(); // possible bug
     requestAnimationFrame(this.run);
   }
+
   _handleTouchStart = (event) => {
     this.lastTapTime = Date.now();
     this.lastTap = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
@@ -28,12 +30,14 @@ export class Game {
       utils.safePlayAudio(utils.PAUSE_SFX); // audio cue
     }
   }
+
   _handleTouchEnd = (event) => { // long press
     clearTimeout(this.longPress);
     this.longPress = null;
     this.lastTap = null;
     this.lastTapTime = null;
   }
+
   _handleKeyInput = (event) => {
     if (!this.gameOver && (event.key === "Enter" || (event.key === ' ' && this.paused))) {
        this.handlePause();
@@ -43,6 +47,7 @@ export class Game {
       utils.GAME_BGM.muted = utils.GAME_BGM && !utils.GAME_BGM.muted;
     }
   }
+
   handlePause = () => {
     let alreadyPaused = this.paused;
     this.paused = !this.paused || !document.fullscreenElement;
@@ -69,15 +74,21 @@ export class Game {
       this.player.registerInputs();
     }
   }
+
   register = (gameObj) => {
     this.gameObjects.set(++this.nextObjectId, gameObj);
     return this.nextObjectId;
   }
-  deregister = (objId) => { this.cleanupIds.push(objId) }
+
+  deregister = (objId) => {
+    this.cleanupIds.push(objId);
+  }
+
   cleanup = () => {
     this.cleanupIds.forEach((objId) => { this.gameObjects.delete(objId) });
     this.cleanupIds = [];
   }
+
   newGame = () => {
     if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
     this.canRestart = false;
@@ -108,6 +119,7 @@ export class Game {
       this.player.registerInputs();
     }
   }
+
   createBgStars = () => {
     this.bgStars = [];
     for (let i = 0; i < 1000; i++) { 
@@ -116,6 +128,7 @@ export class Game {
                           utils.randomVal(-utils.canvas.height, utils.canvas.height*2)));
     }
   }
+
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
     if (!this.gameOver) {
       if (utils.DEBUG) console.log('spawning hazard; TTI:', this.timeToImpact);
@@ -144,10 +157,14 @@ export class Game {
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
+
   checkAsteroidCollision = (collisionObj) => {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
-      if ('isHazard' in gameObj && Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
+      if ('isHazard' in gameObj && gameObj.objId !== collisionObj.objId &&
+          Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && 
+          Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius() &&
+          (!'parentId' in gameObj || gameObj.parentId !== collisionObj.objId)) {
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
         return true;
@@ -155,6 +172,7 @@ export class Game {
     }
     return false;
   }
+
   createPauseText = () => {
     this.pauseText = [
       this.new ? 'BLASTEROIDS' : 'GAME PAUSED',
@@ -165,6 +183,7 @@ export class Game {
                   : utils.randomChoice(['GOOD LUCK', 'GODSPEED', 'STAY SHARP', 'HAVE FUN', 'PUNCH IT', 'GET READY'])
     ]
   }
+
   rankPlayer = () => {
     let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.7);
     let pacifist = (this.shots === 0);
@@ -218,6 +237,7 @@ export class Game {
       (utils.MOBILE ? 'HOLD' : 'ENTER') + ' FOR NEW GAME'
     ]
   }
+
   update = () => {
     if (!this.paused) { this.gameObjects.forEach((gameObj) => { gameObj.update() }); }
     if (this.gameOver) {
@@ -230,6 +250,7 @@ export class Game {
     // Long story long, all gameObjects now are explicitly destroyed on game over to prevent this.
     }
   }
+
   render = () => {
     utils.resizeCanvas(); // done each frame in case the window is resized
     utils.ctx.clearRect(0, 0, utils.canvas.width, utils.canvas.height);
@@ -307,7 +328,8 @@ export class Game {
         utils.traceRing(this.lastTap.x, this.lastTap.y, 70, ringColor, pressPct);
       }
     }
-  } 
+  }
+
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
       if (!this.paused) {
@@ -340,4 +362,5 @@ export class Game {
       requestAnimationFrame(this.run);
     }
   }
+
 }
