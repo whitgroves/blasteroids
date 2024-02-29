@@ -3,9 +3,8 @@ import { Player, Asteroid, BigAsteroid, Comet, UFO, Upgrade } from "./gameobject
 
 export class Game {
   constructor() {
-    // utils.safePlayAudio(utils.TITLE_BGM);
     this.new = true; // flag for game start text on first arrival
-    this.lastTick = 0; // tracks ms since first arrival for deltaTime calcs
+    this.lastTick = 0; // tracks ms since first arrival for deltaTime
     if (utils.MOBILE) {
       this.waitingForDoubleTap = false;
       this.longPress = null;
@@ -18,7 +17,6 @@ export class Game {
     requestAnimationFrame(this.run);
   }
   _handleTouchStart = (event) => {
-    // event.preventDefault(); // block resize on double-tap
     this.lastTapTime = Date.now();
     this.lastTap = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.longPress = this.longPress || setTimeout((this.gameOver ? this.newGame : this.handlePause), utils.LTAP_TIMEOUT);
@@ -28,20 +26,18 @@ export class Game {
     } else if (this.paused && !this.new) { // recalibrate
       this.player.neutral = null; // neutral pos will reset on resume
       utils.safePlayAudio(utils.PAUSE_SFX); // audio cue
-      // if (utils.DEBUG) alert('gyroscope will reset on resume');
     }
   }
   _handleTouchEnd = (event) => { // long press
-    // event.preventDefault();
     clearTimeout(this.longPress);
     this.longPress = null;
     this.lastTap = null;
     this.lastTapTime = null;
   }
   _handleKeyInput = (event) => {
-    if (!this.gameOver && event.key === "Enter") {
+    if (!this.gameOver && (event.key === "Enter" || (event.key === ' ' && this.paused))) {
        this.handlePause();
-    } else if (this.gameOver && event.key === "Enter") {
+    } else if (this.canRestart && (event.key === "Enter" || event.key === ' ')) {
       this.newGame();
     } else if (event.key === 'm') {
       utils.GAME_BGM.muted = utils.GAME_BGM && !utils.GAME_BGM.muted;
@@ -64,11 +60,8 @@ export class Game {
       if (this.new) {
         utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
         this.hazardTimer = setTimeout(this.spawnHazard, Math.max(0, this.timeToImpact));
-        // this.player.registerInputs();
-        // setTimeout(this.player.registerInputs, 100);
         this.new = false;
       } else {
-        // this.lastTick += (Date.now() - this.pauseTime);
         this.spawnHazard();
       }
       utils.safePlayAudio(utils.PAUSE_SFX);
@@ -87,6 +80,7 @@ export class Game {
   }
   newGame = () => {
     if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
+    this.canRestart = false;
     utils.resizeCanvas(); // covering all bases
     this.deltaTime = 0;
     this.paused = false;
@@ -115,8 +109,11 @@ export class Game {
   }
   createBgStars = () => {
     this.bgStars = [];
-    for (let i = 0; i < 1000; i++) { this.bgStars.push(new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
-                                                                   utils.randomVal(-utils.canvas.height, utils.canvas.height*2))); }
+    for (let i = 0; i < 1000; i++) { 
+      this.bgStars.push(
+        new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
+                          utils.randomVal(-utils.canvas.height, utils.canvas.height*2)));
+    }
   }
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
     if (!this.gameOver) {
@@ -277,7 +274,10 @@ export class Game {
             this.jingle = (utils.JINGLE_RANK_S);
             break;
         }
-        this.jingle.onended = (e) => { if (this.gameOver) { utils.safeToggleAudio(utils.GAME_BGM); } }; // resume bgm when done
+        this.jingle.onended = (e) => {
+          if (this.gameOver) utils.safeToggleAudio(utils.GAME_BGM); // resume bgm when done
+          this.canRestart = true;
+        }; 
         utils.safeToggleAudio(utils.GAME_BGM); // pause as late as possible to minimize audio gap
         utils.safePlayAudio(this.jingle);
       }

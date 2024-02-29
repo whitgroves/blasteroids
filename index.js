@@ -25,7 +25,6 @@ const handleFullscreen = (event) => {
 utils.canvas.addEventListener(userEvent, handleFullscreen);
 
 const handleScreenChange = () => {
-  // utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
   if (game.gameOver) {
     utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly');
     utils.safeToggleAudio(utils.JINGLE_RANK_D, 'pauseOnly');
@@ -47,7 +46,6 @@ addEventListener('fullscreenchange', (event) => {
 });
 
 screen.orientation.addEventListener('change', (event) => {
-  // if (utils.DEBUG) alert(`ScreenOrientation change: ${event.target.type}, ${event.target.angle}`);
   handleScreenChange();
   utils.resizeCanvas();
   game.createBgStars();
