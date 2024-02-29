@@ -271,7 +271,7 @@ export class Game {
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 3 : 1);
     let fontSize = utils.FONT_SIZE * utils.getScale();
-    if (!this.new) {
+    if (!this.new && !this.gameOver) {
       utils.displayText(`SCORE`, padding, padding+fontSize);
       utils.displayText(this.score, padding, padding+fontSize*2);
     }
