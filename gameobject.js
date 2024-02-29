@@ -9,6 +9,7 @@ export class GameObject {
     this.radius = radius;
     this.theta = theta;
     this.destroyed = false;
+    this.parentId = null;
   }
   getRadius = () => { return utils.getScale() * this.radius } // wrapper to rescale on landscape-utils.MOBILE
   inBounds = () => { return -this.getRadius() <= this.loc.x && this.loc.x <= utils.canvas.width+this.getRadius() 
@@ -44,11 +45,14 @@ export class GameObject {
 export class Projectile extends GameObject {
   constructor(game, loc, theta) { super(game, loc, new utils.Vector2(Math.cos(theta), Math.sin(theta), utils.PROJ_V), 0, theta) }
   update = () => {
-    let hit = this.game.checkAsteroidCollision(this);
+    let hit = this.game.checkHazardCollision(this);
     if (!hit && this.inBounds()) {
       this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * utils.getScale());
     } else {
-      if (hit) this.game.hits++;
+      if (hit && hit.value) {
+        this.game.hits++;
+        this.game.score += hit.value;
+      }
       this.destroy();
     }
   }
@@ -193,7 +197,7 @@ export class Player extends GameObject {
     this.vel.apply(this._safeUpdateVelocity);
     this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, utils.canvas.width));
     this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, utils.canvas.height));
-    this.game.checkAsteroidCollision(this); // collision check
+    this.game.checkHazardCollision(this); // collision check
   }
   render = () => { utils.tracePoints(this._points(utils.TRIANGLE), true, this.color, this.color); } // TODO: change color based on upgrade level
 }
@@ -207,52 +211,100 @@ export class Hazard extends GameObject {
     this.value = value;
     this.isHazard = true; // collision filter
   }
+  // _onUpdate = () => { this.game.checkHazardCollision(this) }
   _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()); } // default
   _onDestroyAudio = () => { utils.safePlayAudio(utils.BOOM_SFX_0); } // default
   _onDestroyHazard = () => {} // virtual, re-wraps destruction logic
   _onDestroy = () => {
     this._onDestroyHazard(); // called before score update so subclass can change its value if conditions are met
     if (!this.game.gameOver) {
-      this.game.score += this.value;
+      // this.game.score += this.value;
       if (this.inBounds()) this._onDestroyAudio();
+      else this.game.score++;
     }
   }
   render = () => { utils.tracePoints(this._points(this.shape), this.shape, this.color); } // using this.shape as enclose flag
 }
 
-export class Asteroid extends Hazard {
+// export class Asteroid extends Hazard {
+//   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
+//     let rng = utils.randomVal(-0.2, 0.2);
+//     vscale = (vscale || utils.ROCK_V) * (1 + rng);
+//     radius = (radius || utils.ROCK_R) * (1 - rng);
+//     shape = shape || utils.OCTAGON;
+//     color = color || utils.ROCK_C;
+//     value = value || 1;
+//     super(game, loc, vscale, theta, radius, shape, color, value);
+//     this.shape = this.shape.map(x => x += utils.randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
+//     this.vscale = vscale; // needed for BigAsteroid
+//   }
+// }
+
+export class Asteroid2 extends Hazard {
   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
-    let rng = utils.randomVal(-0.2, 0.2);
-    vscale = (vscale || utils.ROCK_V) * (1 + rng);
-    radius = (radius || utils.ROCK_R) * (1 - rng);
+    let sizeCap = (game.score > 25 ? 3 : game.score > 3 ? 2 : 1);
+    let grade = radius ? Math.max(1, Math.floor(radius*utils.ROCK_R_DIV)) : utils.randomInt(1, sizeCap);
+    // let rng = utils.randomVal(-0.2, 0.2);
+    radius = (radius || utils.ROCK_R * grade) * (1 + utils.randomVal(-0.15, 0.15));
+    vscale = (vscale || utils.ROCK_V) * (utils.ROCK_R * radius**-1) // / grade) * (1 - rng);
+    vscale = Math.max(Math.min(vscale, utils.ROCK_V_MAX), utils.ROCK_V_MIN);
     shape = shape || utils.OCTAGON;
     color = color || utils.ROCK_C;
     value = value || 1;
     super(game, loc, vscale, theta, radius, shape, color, value);
     this.shape = this.shape.map(x => x += utils.randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
-    this.vscale = vscale; // needed for BigAsteroid
+    this.vscale = vscale;
+    this.isBig = this.radius >= utils.ROCK_R * 1.5;
+    // this.grade = grade;
   }
-}
-
-export class BigAsteroid extends Asteroid {
-  constructor(game, loc) {
-    super(game, loc, null, null, utils.BIGROCK_R, null, null, 3);
+  _onDestroyAudio = () => {
+    if (this.isBig) utils.safePlayAudio(utils.BOOM_SFX_1);
+    else utils.safePlayAudio(utils.BOOM_SFX_0);
   }
-  _onDestroyAudio = () => { utils.safePlayAudio(utils.BOOM_SFX_1); }
-  _onDestroyHazard = () => { // spawn 2 asteroids in a 120 degree cone
-    if (this.inBounds()) { // TODO: split velocity
-      let split = this.game.score > 25 && this.radius > utils.BIGROCK_R ? 3 : 2;
-      let vscale = this.vscale// * 0.8; //(split > 2 ? 0.667 : 0.8);;
-      // let radius = this.radius / split;
-      new Asteroid(this.game, this.loc.copy(), this.theta+Math.PI*utils.randomVal(0.1667, 0.25), vscale) //, radius);
-      new Asteroid(this.game, this.loc.copy(), this.theta-Math.PI*utils.randomVal(0.1667, 0.25), vscale) //, radius); 
-      if (split > 2) { 
-      // if (this.game.score > 25 && this.radius > utils.BIGROCK_R) { // 3rd can spawn after a specific score is reached
-        new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * utils.randomVal(-0.1667, 0.1667), vscale) //, radius);
+  _onDestroyHazard = () => {
+    if (this.isBig && this.inBounds()) {
+      let flipTheta = false;
+      let remainingRadius = this.radius * 0.9; // * utils.randomVal(0.5, 0.8);
+      let loops = 0; // just in case
+      let chunks = Math.floor(this.radius*utils.ROCK_R_DIV); // utils.randomInt(1, this.grade);
+      // console.log('grade', this.grade);
+      while (remainingRadius > utils.ROCK_R_MIN && loops < chunks) {
+        // console.log('spawn', loops);
+        // if (utils.DEBUG) console.log('bigspawn', this.value, remainingRadius);
+        let newRadius = Math.max(utils.randomVal(utils.ROCK_R, (remainingRadius*utils.ROCK_R_DIV)), utils.ROCK_R);
+        remainingRadius -= newRadius;
+        let theta = this.theta + (chunks === 1 ? 0 :
+                   ((flipTheta ? -1 : 1) * Math.PI * (loops+1 % 3 == 0 ?
+                                                      utils.randomVal(-0.1667, 0.1667) : 
+                                                      utils.randomVal(0.1667, 0.25)))); // utils.randomVal(0.1667, (loops % 3 == 0? 0.25 : -0.1667))));
+        let asteroid = new Asteroid2(this.game, this.loc.copy(), theta, this.vscale, newRadius);
+        asteroid.parentId = this.objId;
+        flipTheta = !flipTheta;
+        loops++;
       }
     }
   }
 }
+
+// export class BigAsteroid extends Asteroid {
+//   constructor(game, loc) {
+//     super(game, loc, null, null, utils.BIGROCK_R, null, null, 3);
+//   }
+//   _onDestroyAudio = () => { utils.safePlayAudio(utils.BOOM_SFX_1); }
+//   _onDestroyHazard = () => { // spawn 2 asteroids in a 120 degree cone
+//     if (this.inBounds()) { // TODO: split velocity
+//       let split = this.game.score > 25 && this.radius > utils.BIGROCK_R ? 3 : 2;
+//       let vscale = this.vscale// * 0.8; //(split > 2 ? 0.667 : 0.8);;
+//       // let radius = this.radius / split;
+//       new Asteroid(this.game, this.loc.copy(), this.theta+Math.PI*utils.randomVal(0.1667, 0.25), vscale) //, radius);
+//       new Asteroid(this.game, this.loc.copy(), this.theta-Math.PI*utils.randomVal(0.1667, 0.25), vscale) //, radius); 
+//       if (split > 2) { 
+//       // if (this.game.score > 25 && this.radius > utils.BIGROCK_R) { // 3rd can spawn after a specific score is reached
+//         new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * utils.randomVal(-0.1667, 0.1667), vscale) //, radius);
+//       }
+//     }
+//   }
+// }
 
 export class Upgrade extends Hazard { // not really a hazard but behavior is 90% the same
   constructor(game, loc) {
@@ -264,6 +316,7 @@ export class Upgrade extends Hazard { // not really a hazard but behavior is 90%
     this.gradientIndex = 0;
     this.gradientStep = -1; // will flip on first call to `render()`
   }
+  // _onUpdate = () => {} // mask base class collision check
   _onDestroy = () => {
     if (this.inBounds() && this.game.player.weapon.level < utils.MAX_WEAPON_LVL) { // skip to the highest available level
       this.game.player.weapon.level = Math.min(utils.MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // * 1/75
@@ -279,9 +332,9 @@ export class Upgrade extends Hazard { // not really a hazard but behavior is 90%
   }
 }
 
-export class Comet extends Asteroid {
+export class Comet extends Asteroid2 {
   constructor(game, loc) {
-    super(game, loc, null, utils.COMET_V, utils.COMET_R, utils.PENTAGON, utils.COMET_C, 0); // only give points if hit
+    super(game, loc, null, utils.COMET_V, utils.COMET_R, utils.PENTAGON, utils.COMET_C, 7); // only give points if hit
     this._turnAmt = utils.randomVal(-utils.COMET_TA, utils.COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
     utils.safePlayAudio(utils.COMET_SFX_0);
@@ -291,8 +344,9 @@ export class Comet extends Asteroid {
     utils.COMET_SFX_0.muted = true; // force whoosh sound to stop
     utils.safePlayAudio(utils.COMET_SFX_1);
   }
-  _onDestroyHazard = () => { if (this.inBounds()) { this.value = 7; } }
+  // _onDestroyHazard = () => { if (this.inBounds()) { this.value = 7; } }
   _onUpdate = () => {
+    this.game.checkHazardCollision(this);
     this.theta += this._turnAmt;
     this.vel.update(Math.cos(this.theta), Math.sin(this.theta), utils.COMET_V);
   }
@@ -303,9 +357,7 @@ export class EnemyProjectile extends Hazard {
     super(game, loc, utils.PROJ_V, theta, game.player.getRadius(), null, utils.UFO_C, 1); // player radius used for collision
     this.parentId = parentId; // collision filter
   }
-  // _onUpdate = () => {
-  //   this.game.checkAsteroidCollision(this);
-  // }
+  _onUpdate = () => { this.game.checkHazardCollision(this) }
   _points = () => { return [this.loc, new utils.Vector2(this.loc.x-this.vel.x*utils.PROJ_L, this.loc.y-this.vel.y*utils.PROJ_L)]; }
   _onDestroyAnimate = () => { new ImplosionAnimation(this.game, this.loc, this.color, utils.PROJ_L); }
 }
@@ -313,7 +365,7 @@ export class EnemyProjectile extends Hazard {
 export class UFO extends Hazard {
   constructor(game, loc) {
     utils.safePlayAudio(utils.UFO_SFX_0);
-    super(game, loc, utils.UFO_V, null, utils.UFO_R, utils.DIAMOND, utils.UFO_C, 0);
+    super(game, loc, utils.UFO_V, null, utils.UFO_R, utils.DIAMOND, utils.UFO_C, 5);
     this._chaseFrames = 0;
     this._chaseLimit = Math.max(3000, 5000-game.timeToImpact); // longer games => longer chases
     this._trigger = setTimeout(this._fire, this._getFireRate()); // must store timeout response to clear it later
@@ -337,13 +389,14 @@ export class UFO extends Hazard {
   _onDestroyHazard = () => {
     clearTimeout(this._trigger); // ceasefire
     utils.UFO_SFX_0.muted = true; // stop engine noise until next UFO spawns
-    if (this.inBounds()) { this.value = 8; }
-    else if (!this.game.gameOver) { // if it makes it safely out of bounds, spawn back in with the next hazard
-      setTimeout(() => { new UFO(this.game, utils.randomSpawn()); }, this.game.timeToImpact);
+    // if (this.inBounds()) { this.value = 5; }
+    // else if (!this.game.gameOver) { // if it makes it safely out of bounds, spawn back in with the next hazard
+    if (!this.inBounds() && !this.game.gameOver) {
+      setTimeout(() => { new UFO(this.game, utils.randomSpawn()); }, this._getFireRate());
     }
   }
   _onUpdate = () => {
-    this.game.checkAsteroidCollision(this);
+    this.game.checkHazardCollision(this);
     if (this._getActiveState()) {
       let newTheta = Math.atan2(this.game.player.loc.y-this.loc.y, this.game.player.loc.x-this.loc.x);
       let dt = newTheta - this.theta;

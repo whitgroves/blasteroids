@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.27.2032';
+export const BUILD = '2024.02.28.2201';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -29,7 +29,7 @@ export const FONT_FAM = 'monospace';
 export const PADDING = 10;
 export const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 export const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
-export const PARALLAX = 0.2;                     // ratio for parallax effect
+export const PARALLAX = 0.1;                     // ratio for parallax effect
 export const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 export const TITLE_BGM = document.getElementById('titleBgm');
@@ -78,7 +78,11 @@ BOOM_SFX_2.volume = 0.4;
 // asteroid 
 export const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 export const ROCK_R = PLAYER_R * 2;
+export const ROCK_R_DIV = 1 / ROCK_R;
+export const ROCK_R_MIN = ROCK_R * 0.9;
 export const ROCK_V = 0.3;
+export const ROCK_V_MIN = ROCK_V * 0.5;
+export const ROCK_V_MAX = ROCK_V * 1.2;
 export const ROCK_C = '#FFF'
 
 // big asteroid
@@ -204,7 +208,7 @@ export const safeToggleAudio = (audio, mode='auto') => {
 // rng
 export const randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
 export const randomVal = (min, max) => { return Math.random() * (max - min) + min } // output range is [min, max)
-// randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max + 1))) } // output range is [min, max]
+export const randomInt = (min, max) => { return Math.floor(randomVal(Math.ceil(min), Math.floor(max + 1))) } // output range is [min, max]
 export const randomSpawn = () => { // generates a random spawn point on the edge of the screen
   let x = null;
   let y = null;

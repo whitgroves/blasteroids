@@ -1,5 +1,5 @@
 import * as utils from "./utils.js";
-import { Player, Asteroid, BigAsteroid, Comet, UFO, Upgrade } from "./gameobject.js";
+import { Player, Asteroid2, Comet, UFO, Upgrade } from "./gameobject.js";
 
 export class Game {
 
@@ -138,19 +138,23 @@ export class Game {
         spawnClass = Upgrade;
         this.upgradeInPlay = true;
       } else if (this.score > 300) {
-        spawnClass = utils.randomChoice([Asteroid, BigAsteroid, Comet, UFO, UFO, UFO]);
+        // spawnClass = utils.randomChoice([Asteroid, BigAsteroid, Comet, UFO, UFO, UFO]);
+        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Comet, UFO, UFO, UFO]);
       } else if (this.score > 200) {
-        spawnClass = utils.randomChoice([Asteroid, BigAsteroid, Comet, UFO]);
+        // spawnClass = utils.randomChoice([Asteroid, BigAsteroid, Comet, UFO]);
+        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Comet, UFO]);
       } else if (this.score > 150) {
-        spawnClass = utils.randomChoice([Asteroid, BigAsteroid, BigAsteroid, Comet, Comet]);
+        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Comet, Comet]);
       } else if (this.score > 100) {
-        spawnClass = utils.randomChoice([Asteroid, BigAsteroid, BigAsteroid, Comet]);
+        // spawnClass = utils.randomChoice([Asteroid, BigAsteroid, BigAsteroid, Comet]);
+        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Comet]);
       } else if (this.score > 50) {
-        spawnClass = utils.randomChoice([Asteroid, Asteroid, BigAsteroid, BigAsteroid, BigAsteroid, Comet]);
-      } else if (this.score > 3) {
-        spawnClass = utils.randomChoice([Asteroid, BigAsteroid]);
+        // spawnClass = utils.randomChoice([Asteroid, Asteroid, BigAsteroid, BigAsteroid, BigAsteroid, Comet]);
+        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Asteroid2, Asteroid2, Comet]);
+      // } else if (this.score > 3) {
+      //   spawnClass = utils.randomChoice([Asteroid, BigAsteroid]);
       } else {
-        spawnClass = Asteroid;
+        spawnClass = Asteroid2;
       }
       new spawnClass(this, utils.randomSpawn());
       this.timeToImpact = Math.max(utils.HAZARD_MIN_MS, this.timeToImpact-this.score);
@@ -158,19 +162,24 @@ export class Game {
     }
   }
 
-  checkAsteroidCollision = (collisionObj) => {
+  checkHazardCollision = (collisionObj) => {
     for (const k of this.gameObjects.keys()) {
       let gameObj = this.gameObjects.get(k);
-      if ('isHazard' in gameObj && gameObj.objId !== collisionObj.objId &&
+      if ('isHazard' in gameObj && 
+          gameObj.objId !== collisionObj.objId &&
           Math.abs(collisionObj.loc.x-gameObj.loc.x) < gameObj.getRadius() && 
-          Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius() &&
-          (!'parentId' in gameObj || gameObj.parentId !== collisionObj.objId)) {
+          Math.abs(collisionObj.loc.y-gameObj.loc.y) < gameObj.getRadius()) {
+            if ((gameObj.parentId || collisionObj.parentId) && 
+                (gameObj.parentId === collisionObj.parentId ||
+                 gameObj.parentId === collisionObj.objId || 
+                 gameObj.objId === collisionObj.parentId)) return null;
+            if (gameObj.isUpgrade && collisionObj.isHazard) return null;
         if (!gameObj.isUpgrade) collisionObj.destroy();
         gameObj.destroy();
-        return true;
+        return gameObj;
       }
     }
-    return false;
+    return null;
   }
 
   createPauseText = () => {
@@ -296,12 +305,10 @@ export class Game {
             this.jingle = (utils.JINGLE_RANK_S);
             break;
         }
-        this.jingle.onended = (e) => {
-          if (this.gameOver) utils.safeToggleAudio(utils.GAME_BGM); // resume bgm when done
-          this.canRestart = true;
-        }; 
+        this.jingle.onended = (e) => { if (this.gameOver) utils.safeToggleAudio(utils.GAME_BGM) }; // resume after
         utils.safeToggleAudio(utils.GAME_BGM); // pause as late as possible to minimize audio gap
         utils.safePlayAudio(this.jingle);
+        setTimeout(() => this.canRestart = true, 500);
       }
       if (utils.GAME_BGM.volume > 0.005) { utils.GAME_BGM.volume -= 0.0002; } // fade out
       else { 
