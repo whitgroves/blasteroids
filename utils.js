@@ -67,6 +67,7 @@ export const PROJ_V = 1;  // velocity
 export const PROJ_L = 10; // length
 
 // hazard
+export const HAZARD_MIN_MS = DEBUG ? 3000 : 1000; // minimum spawn timer
 export const BOOM_SFX_0 = document.getElementById('boomSfx_0');
 BOOM_SFX_0.volume = 0.2;
 export const BOOM_SFX_1 = document.getElementById('boomSfx_1');

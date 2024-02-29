@@ -87,7 +87,8 @@ export class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.score = 0; //utils.DEBUG ? 250 : 0;
+    this.timeToImpact = this.new ? 2500 : Math.max(utils.HAZARD_MIN_MS, 2000-this.score); // higher score = faster start
+    this.score = 0;
     this.shots = 0;
     this.hits = 0;
     this.rank = null;
@@ -96,7 +97,7 @@ export class Game {
     this.nextObjectId = -1; // will increment to 0 on first registration
     this.cleanupIds = [];
     this.player = new Player(this);
-    this.timeToImpact = this.new ? 3000 : 2000;
+    // this.timeToImpact = this.new ? 3000 : 2000;
     this.upgradeInPlay = false;
     this.createBgStars();
     if (this.new) this.handlePause(); 
@@ -116,6 +117,7 @@ export class Game {
     }
   }
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
+    console.log(this.timeToImpact);
     if (!this.gameOver) {
       if (utils.DEBUG) console.log('spawning hazard');
       let spawnClass = null;
@@ -138,8 +140,8 @@ export class Game {
       } else {
         spawnClass = Asteroid;
       }
-      new spawnClass(this, utils.randomSpawn()); // new utils.Vector2(x, y));
-      if (this.timeToImpact > (utils.DEBUG ? 5000 : 1000)) { this.timeToImpact -= 25; }
+      new spawnClass(this, utils.randomSpawn());
+      this.timeToImpact = Math.max(utils.HAZARD_MIN_MS, this.timeToImpact-this.score);
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
     }
   }
