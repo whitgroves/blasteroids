@@ -244,18 +244,16 @@ export class Asteroid2 extends Hazard {
   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
     let sizeCap = (game.score > 25 ? 3 : game.score > 3 ? 2 : 1);
     let grade = radius ? Math.max(1, Math.floor(radius*utils.ROCK_R_DIV)) : utils.randomInt(1, sizeCap);
-    // let rng = utils.randomVal(-0.2, 0.2);
-    radius = (radius || utils.ROCK_R * grade) * (1 + utils.randomVal(-0.15, 0.15));
-    vscale = (vscale || utils.ROCK_V) * (utils.ROCK_R * radius**-1) // / grade) * (1 - rng);
-    vscale = Math.max(Math.min(vscale, utils.ROCK_V_MAX), utils.ROCK_V_MIN);
+    radius = (radius || utils.ROCK_R * grade) * (1 + utils.randomVal(-0.1, 0.1));
+    radius = Math.min(radius, utils.ROCK_R_MAX);
+    vscale = (vscale || utils.ROCK_V) * (1 + utils.randomVal(-0.15 * grade, 0));
     shape = shape || utils.OCTAGON;
     color = color || utils.ROCK_C;
     value = value || 1;
     super(game, loc, vscale, theta, radius, shape, color, value);
     this.shape = this.shape.map(x => x += utils.randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
     this.vscale = vscale;
-    this.isBig = this.radius >= utils.ROCK_R * 1.5;
-    // this.grade = grade;
+    this.isBig = radius > utils.ROCK_R * 1.5; // tried grade > 1; but this enables multi-hit asteroids
   }
   _onDestroyAudio = () => {
     if (this.isBig) utils.safePlayAudio(utils.BOOM_SFX_1);
@@ -263,21 +261,18 @@ export class Asteroid2 extends Hazard {
   }
   _onDestroyHazard = () => {
     if (this.isBig && this.inBounds()) {
-      let flipTheta = false;
-      let remainingRadius = this.radius * 0.9; // * utils.randomVal(0.5, 0.8);
-      let loops = 0; // just in case
-      let chunks = Math.floor(this.radius*utils.ROCK_R_DIV); // utils.randomInt(1, this.grade);
-      // console.log('grade', this.grade);
-      while (remainingRadius > utils.ROCK_R_MIN && loops < chunks) {
-        // console.log('spawn', loops);
-        // if (utils.DEBUG) console.log('bigspawn', this.value, remainingRadius);
-        let newRadius = Math.max(utils.randomVal(utils.ROCK_R, (remainingRadius*utils.ROCK_R_DIV)), utils.ROCK_R);
+      let flipTheta = utils.randomChoice([true, false]);
+      let remainingRadius = this.radius;
+      let loops = 0;
+      let chunks = Math.floor(this.radius*utils.ROCK_R_DIV);
+      while (remainingRadius >= utils.ROCK_R && loops < chunks) {
+        let newRadius = Math.max(utils.randomVal(utils.ROCK_R, remainingRadius-utils.ROCK_R), utils.ROCK_R);
         remainingRadius -= newRadius;
         let theta = this.theta + (chunks === 1 ? 0 :
                    ((flipTheta ? -1 : 1) * Math.PI * (loops+1 % 3 == 0 ?
-                                                      utils.randomVal(-0.1667, 0.1667) : 
-                                                      utils.randomVal(0.1667, 0.25)))); // utils.randomVal(0.1667, (loops % 3 == 0? 0.25 : -0.1667))));
-        let asteroid = new Asteroid2(this.game, this.loc.copy(), theta, this.vscale, newRadius);
+                                                      utils.randomVal(-0.125, 0.125) : 
+                                                      utils.randomVal(0.1667, 0.25))));
+        let asteroid = new Asteroid2(this.game, this.loc.copy(), theta, this.vscale*(1-utils.randomVal(0,0.1)), newRadius);
         asteroid.parentId = this.objId;
         flipTheta = !flipTheta;
         loops++;

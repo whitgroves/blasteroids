@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.28.2201';
+export const BUILD = '2024.02.29.1322';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -79,10 +79,9 @@ BOOM_SFX_2.volume = 0.4;
 export const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 export const ROCK_R = PLAYER_R * 2;
 export const ROCK_R_DIV = 1 / ROCK_R;
-export const ROCK_R_MIN = ROCK_R * 0.9;
+export const ROCK_R_MIN = ROCK_R * 0.9; // edge case on larger asteroid breakup
+export const ROCK_R_MAX = ROCK_R * 2.8; // cap the largest asteroids
 export const ROCK_V = 0.3;
-export const ROCK_V_MIN = ROCK_V * 0.5;
-export const ROCK_V_MAX = ROCK_V * 1.2;
 export const ROCK_C = '#FFF'
 
 // big asteroid
