@@ -117,9 +117,8 @@ export class Game {
     }
   }
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
-    console.log(this.timeToImpact);
     if (!this.gameOver) {
-      if (utils.DEBUG) console.log('spawning hazard');
+      if (utils.DEBUG) console.log('spawning hazard; TTI:', this.timeToImpact);
       let spawnClass = null;
       if (!this.upgradeInPlay && this.player.weapon.level < utils.MAX_WEAPON_LVL 
           && Math.floor(this.score * 0.0133) >= this.player.weapon.level) { // check every 75 points (* 0.0133)
@@ -312,7 +311,7 @@ export class Game {
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
       if (!this.paused) {
-        if (!document.hasFocus()) {
+        if (!this.gameOver && !document.hasFocus()) {
           if (utils.DEBUG) console.log('lost focus');
           this.handlePause();
         } else {

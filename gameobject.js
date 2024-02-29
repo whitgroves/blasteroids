@@ -164,8 +164,6 @@ export class Player extends GameObject {
     this.game.gameOver = true;
     this.deregisterInputs();
     // utils.safePlayAudio(BOOM_SFX_2); // clashes with the endgame jingle
-    // new ExplosionAnimation(this.game, this.loc.copy(), this.color, this.getRadius()*10);
-    // BUG: the game doesn't update in the game over state, so this^ animation never plays (WONTFIX)
   }
   _onDestroyAnimate = () => { new ImpactRingAnimation(this.game, this.loc, this.color, this.getRadius()*10); }
   _isTilted = () => { return this.neutral && Math.abs(this.tilt.x-this.neutral.x) > utils.TILT_THRESH | Math.abs(this.tilt.y-this.neutral.y) > utils.TILT_THRESH}
@@ -184,8 +182,7 @@ export class Player extends GameObject {
       this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
     }
     this.theta %= 2 * Math.PI; // radians
-    // fire projectile
-    if (this.firing) {
+    if (this.firing) { // fire projectile
       this.weapon.fire(this.game, this.loc.copy(), this.theta);
       this.firing = false;
       this.game.shots++;
@@ -227,13 +224,16 @@ export class Hazard extends GameObject {
 
 export class Asteroid extends Hazard {
   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
-    vscale = vscale || utils.ROCK_V;
-    radius = radius || utils.ROCK_R;
+    let rng = utils.randomVal(-0.2, 0.1);
+    vscale = (vscale || utils.ROCK_V) * (1 + rng);
+    radius = (radius || utils.ROCK_R) * (1 - rng);
     shape = shape || utils.OCTAGON;
     color = color || utils.ROCK_C;
     value = value || 1;
     super(game, loc, vscale, theta, radius, shape, color, value);
     this.shape = this.shape.map(x => x += utils.randomVal(-1, 1) * (shape.length**-1)); // +/- 1/N
+    this.vscale = vscale; // needed for BigAsteroid
+    // console.log(vscale, radius);
   }
 }
 
@@ -243,11 +243,14 @@ export class BigAsteroid extends Asteroid {
   }
   _onDestroyAudio = () => { utils.safePlayAudio(utils.BOOM_SFX_1); }
   _onDestroyHazard = () => { // spawn 2 asteroids in a 120 degree cone
-    if (this.inBounds()) {
-      new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * utils.randomVal(0.1667, 0.25));
-      new Asteroid(this.game, this.loc.copy(), this.theta - Math.PI * utils.randomVal(0.1667, 0.25)); 
-      if (this.game.score > 25 && utils.randomChoice([true, false])) { // 3rd can spawn after a specific score is reached
-        new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * utils.randomVal(-0.1667, 0.1667));
+    if (this.inBounds()) { // TODO: split velocity
+      let split = this.game.score > 25 && this.radius > utils.BIGROCK_R ? 3 : 2;
+      let vscale = this.vscale * (split > 2 ? 0.667 : 0.8);;
+      let radius = this.radius / split;
+      new Asteroid(this.game, this.loc.copy(), this.theta+Math.PI*utils.randomVal(0.1667, 0.25), vscale, radius);
+      new Asteroid(this.game, this.loc.copy(), this.theta-Math.PI*utils.randomVal(0.1667, 0.25), vscale, radius); 
+      if (split > 2) { // 3rd can spawn after a specific score is reached
+        new Asteroid(this.game, this.loc.copy(), this.theta + Math.PI * utils.randomVal(-0.1667, 0.1667), vscale, radius);
       }
     }
   }
