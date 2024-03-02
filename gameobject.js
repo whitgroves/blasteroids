@@ -104,11 +104,15 @@ export class Player extends GameObject {
     this.firing = false;
     this.boosting = false;
     this.tilt = new utils.Vector2(); // track device tilt on utils.MOBILE to trigger movement 
-    this.neutral = utils.MOBILE ? new utils.Vector2(0, 22) : null; // neutral position for tilt movement
+    this.neutral = utils.MOBILE ? new utils.Vector2(0, utils.TILT_DEFAULT) : null; // neutral position for tilt movement
     this.weapon = new PlayerWeapon();
     this.color = utils.PLAYER_C;
-    if (!utils.MOBILE) new ParticleTrailAnimation(game, this, null, 8, () => { return this.boosting || this.vel.y <= utils.PLAYER_V_FLOOR }); //this.boosting }); // || this._isTilted() });
-    else new ParticleTrailAnimation(game, this, null, 4, () => { return this._isTilted() });
+    let animFunc = utils.MOBILE ?
+                   () => { return this.theta < 0 || this._isTilted() } :
+                   () => { return this.boosting || this.theta < 0 };
+    new ParticleTrailAnimation(game, this, null, (utils.MOBILE ? 4 : 8), animFunc);
+    // new ParticleTrailAnimation(game, this, null, 8, () => { return Math.abs(this.vel.x) >= utils.PLAYER_V_FLOOR || this.vel.y <= utils.PLAYER_V_FLOOR }); //this.boosting }); // || this._isTilted() });
+    // else new ParticleTrailAnimation(game, this, null, 4, () => { return this._isTilted() });
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
@@ -183,19 +187,20 @@ export class Player extends GameObject {
     return v;
   }
   update = () => {
-    if (!this.firing && this._isTilted()) this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
+    if (!this.firing && this._isTilted()) {
+      let newTheta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
+      let dt = newTheta - this.theta;
+      if (dt > Math.PI) dt -= utils.PI_2;
+      this.theta += 0.05 * dt;
+    }
+    // if (!this.firing && this._isTilted()) this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
     if (this.target) this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
-    // if (this.target) { // snap to target
-    //   this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
-    //   // setTimeout(() => this.target = null, 1000); // stay on target for 1s so shots land more consistently
-    // } else if (this._isTilted()) {
-    //   this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
-    // }
-    this.theta %= 2 * Math.PI; // radians
+    this.theta %= utils.PI_2; // radians
     if (this.firing) { // fire projectile
       this.weapon.fire(this.game, this.loc.copy(), this.theta);
       this.firing = false;
       this.game.shots++;
+      if (utils.MOBILE) setTimeout(() => { if (!this.firing) this.target = null }, 1000); // stay on target for 1s until/unless a new one is set
     }
     // apply velocity    
     if (this._isTilted()) this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * utils.getScale()); // scale by 1/90 to normalize raw tilt input
@@ -301,7 +306,7 @@ export class Comet extends Asteroid2 {
     super(game, loc, null, utils.COMET_V, utils.COMET_R, utils.PENTAGON, utils.COMET_C, 7);
     this._turnAmt = utils.randomVal(-utils.COMET_TA, utils.COMET_TA); // follows a random arc
     new ParticleTrailAnimation(game, this);
-    utils.safePlayAudio(utils.COMET_SFX_0);
+    if (utils.COMET_SFX_0.paused) utils.safePlayAudio(utils.COMET_SFX_0);
   }
   _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*7); }
   _onDestroyAudio = () => {
@@ -363,7 +368,9 @@ export class UFO extends Hazard {
     if (this._getActiveState()) {
       let newTheta = Math.atan2(this.game.player.loc.y-this.loc.y, this.game.player.loc.x-this.loc.x);
       let dt = newTheta - this.theta;
-      if (Math.abs(dt) > Math.PI/4) this.theta += 0.05 * dt;
+      if (dt > Math.PI) dt -= utils.PI_2;
+      // if (Math.abs(dt) > Math.PI/4) 
+      this.theta += 0.05 * dt;
       this.theta %= Math.PI * 2;
       this.vel.update(Math.cos(this.theta), Math.sin(this.theta), utils.UFO_V);
       this._chaseFrames += 1;

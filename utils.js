@@ -16,6 +16,7 @@ export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // 
 export const DTAP_TIMEOUT = 300;
 export const LTAP_TIMEOUT = 500; // how long to wait for a long press
 export const TILT_THRESH = 3;
+export const TILT_DEFAULT = 33; // default neutral value for y-tilt
 
 if (MOBILE && DEBUG) addEventListener('error', (e) => alert('Error: Ln: '+e.lineno+', Col: '+e.colno+': '+e.message));
 
@@ -33,7 +34,7 @@ export const PARALLAX = 0.2;                     // ratio for parallax effect
 export const BG_RES = 10;                        // y-pixels to skip when drawing bg stars
 export const BG_SCROLL = BG_RES * 0.25;
 export const BG_SCROLL_MAX = BG_RES * 0.5; // * 1.5; // even 1x is nauseating
-export const BG_SCROLL_ACC = 0.01;         // rate the scroll changes per frame
+export const BG_SCROLL_ACC = MOBILE ? 0.005 : 0.01;         // rate the scroll changes per frame
 export const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 export const TITLE_BGM = document.getElementById('titleBgm');
@@ -51,15 +52,16 @@ export const JINGLE_RANK_A = document.getElementById('rankSfx_A');
 JINGLE_RANK_A.volume = .4;
 export const JINGLE_RANK_S = document.getElementById('rankSfx_S');
 JINGLE_RANK_S.volume = .3;
+export const PI_2 = Math.PI * 2; // comes up a lot
 
 // player
 export const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 export const PLAYER_R = MOBILE ? 20 : 16;     // radius
 export const PLAYER_V = MOBILE ? 15 : 12;     // max vel
-export const PLAYER_V_FLOOR = 0.01;          // vel min before damping to 0
+export const PLAYER_V_FLOOR = 0.01;           // vel min before damping to 0
 export const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 export const PLAYER_F = 0.02;                 // friction
-export const PLAYER_C = '#0FF'                // player (and player projectile) color
+export const PLAYER_C = DEBUG ? '#0FF' : '#0AA';
 export const playerSpawnX = () => { return canvas.width * 0.5 }
 export const playerSpawnY = () => { return canvas.height * 0.8 }
 
@@ -104,7 +106,7 @@ export const UPGRADE_SFX_1 = document.getElementById('upgradeSfx_1');
 UPGRADE_SFX_1.volume = .2;
 
 // comet
-export const PENTAGON = [0, (2 * Math.PI / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
+export const PENTAGON = [0, (PI_2 / 5), (4 * Math.PI / 5), (6 * Math.PI / 5), (8 * Math.PI / 5)];
 export const COMET_C = '#FD0';
 export const COMET_R = ROCK_R * 0.5;
 export const COMET_V = ROCK_V * 2;
@@ -118,7 +120,7 @@ COMET_SFX_1.volume = .3;
 export const UFO_R = PLAYER_R * 1.5;
 export const UFO_V = ROCK_V * 0.67;
 export const UFO_C = '#F00';
-export const DIAMOND = [0, (2 * Math.PI / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
+export const DIAMOND = [0, (PI_2 / 3), (5 * Math.PI / 6), (7 * Math.PI / 6), (4 * Math.PI / 3)];
 export const UFO_SFX_0 = document.getElementById('ufoSfx_0');
 export const UFO_SFX_1 = document.getElementById('ufoSfx_1');
 UFO_SFX_1.volume = .5;
@@ -159,7 +161,7 @@ export const traceRing = (x, y, radius, color=LINE_COLOR, progress=1.0, ccw=fals
   ctx.beginPath();
   ctx.strokeStyle = color;
   ctx.lineWidth = getLineWidth() * 3;
-  ctx.arc(x, y, radius, 0, (2 * Math.PI * progress), ccw);
+  ctx.arc(x, y, radius, 0, (PI_2 * progress), ccw);
   ctx.stroke();
 }
 export const displayText = (text, x, y, color=LINE_COLOR) => {

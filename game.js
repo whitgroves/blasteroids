@@ -110,7 +110,7 @@ export class Game {
     this.gameOver = false;
     this.gameOverText = null;
     this.timeToImpact = this.getStartingTimeToImpact(); // must precede score reset
-    this.score = 0;
+    this.score = utils.DEBUG ? 200 : 0;
     this.shots = 0;
     this.hits = 0;
     this.rank = null;
@@ -340,7 +340,7 @@ export class Game {
         utils.safeToggleAudio(utils.GAME_BGM); // pause as late as possible to minimize audio gap
         utils.safePlayAudio(this.jingle);
       }
-      if (utils.GAME_BGM.volume > 0.005) { utils.GAME_BGM.volume -= 0.0007; } // fade out
+      if (utils.GAME_BGM.volume > 0.005) { if (this.canRestart) utils.GAME_BGM.volume -= 0.0007; } // fade out
       else { 
         utils.GAME_BGM.volume = 0;
         utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly'); // after full fade out, pause flag is used to restart bgm
