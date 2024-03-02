@@ -123,7 +123,8 @@ export class Game {
     if (!this.bgStars) this.createBgStars();
     if (this.new) this.handlePause(); 
     else {
-      utils.safeToggleAudio(utils.GAME_BGM, 'playOnly'); // restart after total fade out
+      if (utils.GAME_BGM.volume === 0) utils.safePlayAudio(utils.GAME_BGM);
+      else utils.safeToggleAudio(utils.GAME_BGM, 'playOnly');
       utils.GAME_BGM.volume = utils.GAME_BGM_VOL; // reset volume from fade out
       this.hazardTimer = setTimeout(this.spawnHazard, this.timeToImpact);
       this.player.registerInputs();
@@ -339,10 +340,10 @@ export class Game {
         utils.safeToggleAudio(utils.GAME_BGM); // pause as late as possible to minimize audio gap
         utils.safePlayAudio(this.jingle);
       }
-      if (utils.GAME_BGM.volume > 0.005) { utils.GAME_BGM.volume -= 0.0002; } // fade out
+      if (utils.GAME_BGM.volume > 0.005) { utils.GAME_BGM.volume -= 0.0007; } // fade out
       else { 
         utils.GAME_BGM.volume = 0;
-        utils.safeToggleAudio(utils.GAME_BGM); // after full fade out, pause flag is used to restart bgm
+        utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly'); // after full fade out, pause flag is used to restart bgm
       }
       utils.displayTextBox(this.gameOverText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
     }
