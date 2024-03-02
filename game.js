@@ -213,7 +213,7 @@ export class Game {
   }
 
   rankPlayer = () => {
-    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.8);
+    let sharpshooter = (this.shots > 30 && this.hits >= this.shots); // * 0.8);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';

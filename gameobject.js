@@ -80,10 +80,12 @@ export class PlayerWeapon {
         new Projectile(game, loc, theta-(Math.PI*cone3));
         break;
       case 2:
-        let xo2 = Math.sin(theta) * utils.OFFSET_RATIO * utils.getScale();
-        let yo2 = Math.cos(theta) * utils.OFFSET_RATIO * utils.getScale();
-        new Projectile(game, new utils.Vector2(loc.x-xo2, loc.y+yo2), theta);
-        new Projectile(game, new utils.Vector2(loc.x+xo2, loc.y-yo2), theta);
+        // let xo2 = Math.sin(theta) * utils.OFFSET_RATIO * utils.getScale();
+        // let yo2 = Math.cos(theta) * utils.OFFSET_RATIO * utils.getScale();
+        // new Projectile(game, new utils.Vector2(loc.x-xo2, loc.y+yo2), theta);
+        // new Projectile(game, new utils.Vector2(loc.x+xo2, loc.y-yo2), theta);
+        new Projectile(game, loc, theta);
+        setTimeout(() => { new Projectile(game, game.player.loc, game.player.theta) }, 70);
         break;
       default:
         new Projectile(game, loc, theta);
