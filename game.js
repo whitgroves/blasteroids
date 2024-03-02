@@ -116,9 +116,8 @@ export class Game {
     this.nextObjectId = -1; // will increment to 0 on first registration
     this.cleanupIds = [];
     this.player = new Player(this);
-    // this.timeToImpact = this.new ? 3000 : 2000;
     this.upgradeInPlay = false;
-    this.createBgStars();
+    if (!this.bgStars) this.createBgStars();
     if (this.new) this.handlePause(); 
     else {
       utils.safeToggleAudio(utils.GAME_BGM, 'playOnly'); // restart after total fade out
@@ -135,6 +134,14 @@ export class Game {
         new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
                           utils.randomVal(-utils.canvas.height, utils.canvas.height*2)));
     }
+    // let yRange = (utils.canvas.height * 3) / utils.BG_RES;
+    // for (let i = 0; i < yRange; i++) {
+    //   for (let j = 0; j < utils.randomInt(0, 10); j++) {
+    //     this.bgStars.push(
+    //       new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
+    //                        (utils.randomVal(i, i+1) * utils.BG_RES)-utils.canvas.height));
+    //   }
+    // }
   }
 
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
@@ -265,13 +272,23 @@ export class Game {
     utils.resizeCanvas(); // done each frame in case the window is resized
     utils.ctx.clearRect(0, 0, utils.canvas.width, utils.canvas.height);
     if (this.bgStars) {
-      if (!this.gameOver && !this.paused) { // couldn't use _inBounds() since check is per-axis
+      if (!this.paused) { // couldn't use _inBounds() since check is per-axis
         let moveX = 0 < this.player.loc.x && this.player.loc.x < utils.canvas.width;
-        let moveY = 0 < this.player.loc.y && this.player.loc.y < utils.canvas.height;
+        // let moveY = 0 < this.player.loc.y && this.player.loc.y < utils.canvas.height;
         this.bgStars.forEach(point => { 
           if (moveX) { point.x -= this.player.vel.x * utils.PARALLAX; }
-          if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
+          // if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
+          point.y += Math.max(utils.BG_SCROLL, (this.score * 0.25 * utils.PARALLAX)) * utils.getScale(); // utils.BG_SCROLL; // TODO: SCALE ON MOBILE getScale??
+          // TODO:   ^ store this value in the class so it can be ramped down on game over
+          if (point.y > utils.canvas.height*2) {
+            point.y = (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height;
+            point.x = utils.randomVal(-utils.canvas.width, utils.canvas.width*2);
+          }
         });
+        // this.bgStars.pop();
+        // this.bgStars.push(
+        //   new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
+        //                    (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height));
       }
       utils.dotPoints(this.bgStars);
     }
@@ -318,7 +335,7 @@ export class Game {
         utils.GAME_BGM.volume = 0;
         utils.safeToggleAudio(utils.GAME_BGM); // after full fade out, pause flag is used to restart bgm
       }
-      utils.displayTextBox(this.gameOverText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);// this.player.loc.x, this.player.loc.y);
+      utils.displayTextBox(this.gameOverText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
     }
     if (utils.DEBUG && this.player) {
       if (utils.MOBILE) {
@@ -361,7 +378,9 @@ export class Game {
           }
         }
       } else if (this.new) { // resolves bug where player would start at a corner/edge instead of mid-screen
-        this.player.loc.update(utils.canvas.width, utils.canvas.height, 0.5);
+        // this.player.loc.update(utils.canvas.width, utils.canvas.height, 0.5);
+        this.player.loc.x = utils.playerSpawnX();
+        this.player.loc.y = utils.playerSpawnY();
         if (utils.MOBILE) this.player.tilt = this.player.neutral.copy();
       }
       this.cleanup();

@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.02.29.1322';
+export const BUILD = '2024.03.01.1700';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -29,7 +29,10 @@ export const FONT_FAM = 'monospace';
 export const PADDING = 10;
 export const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 export const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
-export const PARALLAX = 0.1;                     // ratio for parallax effect
+export const PARALLAX = 0.2;                     // ratio for parallax effect
+export const BG_RES = 10;                        // y-pixels to skip when drawing bg stars
+export const BG_SCROLL = BG_RES * 0.25;
+export const BG_SCROLL_MAX = BG_RES * 2;
 export const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 export const TITLE_BGM = document.getElementById('titleBgm');
@@ -54,7 +57,9 @@ export const PLAYER_R = MOBILE ? 20 : 16;     // radius
 export const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 export const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 export const PLAYER_F = 0.02;                 // friction
-export const PLAYER_C = '#AAA'                // player (and player projectile) color
+export const PLAYER_C = '#0FF'                // player (and player projectile) color
+export const playerSpawnX = () => { return canvas.width * 0.5 }
+export const playerSpawnY = () => { return canvas.height * 0.67 }
 
 // player weapon
 export const MAX_WEAPON_LVL = 4;
@@ -80,7 +85,7 @@ export const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math
 export const ROCK_R = PLAYER_R * 2;
 export const ROCK_R_DIV = 1 / ROCK_R;
 export const ROCK_R_MIN = ROCK_R * 0.9; // edge case on larger asteroid breakup
-export const ROCK_R_MAX = ROCK_R * 2.8; // cap the largest asteroids
+export const ROCK_R_MAX = ROCK_R * 2.7;   // cap the largest asteroids
 export const ROCK_V = 0.3;
 export const ROCK_C = '#FFF'
 

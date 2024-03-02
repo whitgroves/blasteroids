@@ -94,8 +94,8 @@ export class PlayerWeapon {
 
 export class Player extends GameObject {
   constructor(game) {
-    utils.resizeCanvas(); // ensure player ALWAYS spawns at mid-screen
-    super(game, new utils.Vector2(utils.canvas.width*0.5, utils.canvas.height*0.5));
+    // utils.resizeCanvas(); // just in case
+    super(game, new utils.Vector2(utils.playerSpawnX(), utils.playerSpawnY()));
     this.accel = utils.PLAYER_A;
     this.frict = utils.PLAYER_F;
     this.theta = -Math.PI * 0.5 // 0;
@@ -107,7 +107,7 @@ export class Player extends GameObject {
     this.neutral = utils.MOBILE ? new utils.Vector2(0, 22) : null; // neutral position for tilt movement
     this.weapon = new PlayerWeapon();
     this.color = utils.PLAYER_C;
-    new ParticleTrailAnimation(game, this, null, 8, () => { return this.boosting || this._isTilted() });
+    if (!utils.MOBILE) new ParticleTrailAnimation(game, this, null, 8, () => { return this.boosting }); // || this._isTilted() });
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
