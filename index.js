@@ -5,7 +5,15 @@ console.log("Game audio used courtesy of freesound.org and the respective artist
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
 document.getElementById("intro-text").innerText = `↓ ${(utils.MOBILE ? "tap" : "click")} to play ↓`;
-document.getElementById("tagline").innerText = `now with ${utils.randomInt(0, 255)}% more rng`;
+document.getElementById("tagline").innerHTML = utils.randomChoice([
+  `now with ${utils.randomInt(0, 255)}% more rng`,
+  `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", "hand sanitizer"])}`,
+  utils.randomChoice([
+    `"works on my machine" ¯\\_(ツ)_/¯`,
+    `actually garbage`,
+    `not affiliated with the 1987 sequel`,
+  ])
+]);
 
 const game = new Game();
 const userEvent = utils.MOBILE ? 'touchend' : 'click';

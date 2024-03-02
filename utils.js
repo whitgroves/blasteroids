@@ -2,7 +2,7 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.03.01.1700';
+export const BUILD = '2024.03.02.0357';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -32,7 +32,8 @@ export const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just wo
 export const PARALLAX = 0.2;                     // ratio for parallax effect
 export const BG_RES = 10;                        // y-pixels to skip when drawing bg stars
 export const BG_SCROLL = BG_RES * 0.25;
-export const BG_SCROLL_MAX = BG_RES * 2;
+export const BG_SCROLL_MAX = BG_RES * 0.5; // * 1.5; // even 1x is nauseating
+export const BG_SCROLL_ACC = 0.01;         // rate the scroll changes per frame
 export const PAUSE_SFX = document.getElementById('pauseSfx');
 PAUSE_SFX.volume = .4;
 export const TITLE_BGM = document.getElementById('titleBgm');
@@ -55,11 +56,12 @@ JINGLE_RANK_S.volume = .3;
 export const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 export const PLAYER_R = MOBILE ? 20 : 16;     // radius
 export const PLAYER_V = MOBILE ? 15 : 12;     // max vel
+export const PLAYER_V_FLOOR = 0.01;          // vel min before damping to 0
 export const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
 export const PLAYER_F = 0.02;                 // friction
 export const PLAYER_C = '#0FF'                // player (and player projectile) color
 export const playerSpawnX = () => { return canvas.width * 0.5 }
-export const playerSpawnY = () => { return canvas.height * 0.67 }
+export const playerSpawnY = () => { return canvas.height * 0.8 }
 
 // player weapon
 export const MAX_WEAPON_LVL = 4;
@@ -122,6 +124,8 @@ export const UFO_SFX_1 = document.getElementById('ufoSfx_1');
 UFO_SFX_1.volume = .5;
 
 // display
+// var halfWidth = canvas.width * 0.5;
+var halfHeight = canvas.height * 0.5;
 const baseScale = MOBILE ? 0.35 : 1;
 const miniScale = MOBILE ? 3 : 1.25; // upscale for when game isn't fullscreen
 export const getScale = () => { return baseScale * (document.fullscreenElement ? 1 : miniScale) };
@@ -130,6 +134,8 @@ export const getWindowStyle = (attribute) => { return window.getComputedStyle(do
 export const resizeCanvas = () => { // https://stackoverflow.com/questions/4037212/html-canvas-full-screen
   canvas.width = window.innerWidth - getWindowStyle('margin-left') - getWindowStyle('margin-right'); 
   canvas.height = window.innerHeight - getWindowStyle('margin-bottom') - getWindowStyle('margin-top');
+  // halfWidth = canvas.width * 0.5;
+  halfHeight = canvas.height * 0.5;
 }
 export const tracePoints = (points, enclose=true, color=LINE_COLOR, fill=SHAPE_FILL) => { // points is an array of Vector2 (see below)
   ctx.beginPath();
@@ -196,7 +202,8 @@ export const safePlayAudio = (audio) => {
   if (audio) { // make sure file is actually loaded first
     audio.pause(); // https://stackoverflow.com/q/14834520
     audio.currentTime = 0;
-    audio.play(); // TODO: tie this into the fullscreen popup
+    // audio.muted = false;
+    audio.play();
   }
 }
 export const safeToggleAudio = (audio, mode='auto') => {
@@ -218,10 +225,10 @@ export const randomSpawn = () => { // generates a random spawn point on the edge
   let y = null;
   if (randomChoice([true, false])) { 
     x = randomChoice([0, canvas.width]);
-    y = randomVal(0, canvas.height);
+    y = randomVal(0, halfHeight); // playerSpawnY());
   } else {
     x = randomVal(0, canvas.width);
-    y = randomChoice([0, canvas.height]);
+    y = 0; // randomChoice([0, canvas.height]); // with new bg, feels better to not spawn in from the bottom
   }
   return new Vector2(x, y);
 }

@@ -6,6 +6,7 @@ export class Game {
   constructor() {
     this.new = true; // flag for game start text on first arrival
     this.lastTick = 0; // tracks ms since first arrival for deltaTime
+    this.scrollPct = 0; // used to interpolate bg scroll based on timeToImpact
     if (utils.MOBILE) {
       this.waitingForDoubleTap = false;
       this.longPress = null;
@@ -40,12 +41,14 @@ export class Game {
   }
 
   _handleKeyInput = (event) => {
-    if (!this.gameOver && (event.key === "Enter" || (event.key === ' ' && this.paused))) {
-       this.handlePause();
-    } else if (this.canRestart && (event.key === "Enter" || event.key === ' ')) {
-      this.newGame();
-    } else if (event.key === 'm') {
-      utils.GAME_BGM.muted = utils.GAME_BGM && !utils.GAME_BGM.muted;
+    if (document.fullscreenElement) {
+      if (!this.gameOver && (event.key === "Enter" || (event.key === ' ' && this.paused))) {
+        this.handlePause();
+      } else if (this.canRestart && (event.key === "Enter" || event.key === ' ')) {
+        this.newGame();
+      } else if (event.key === 'm') {
+        utils.GAME_BGM.muted = utils.GAME_BGM && !utils.GAME_BGM.muted;
+      }
     }
   }
 
@@ -62,7 +65,7 @@ export class Game {
     if (this.paused && !alreadyPaused) {
       if (!this.new) { // the very first call should be silent
         utils.safePlayAudio(utils.PAUSE_SFX);
-        utils.safeToggleAudio(utils.GAME_BGM);
+        utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly');
       }
       clearTimeout(this.hazardTimer);
       this.pauseTime = Date.now();
@@ -78,7 +81,7 @@ export class Game {
         this.spawnHazard();
       }
       utils.safePlayAudio(utils.PAUSE_SFX);
-      utils.safeToggleAudio(utils.GAME_BGM);
+      utils.safeToggleAudio(utils.GAME_BGM, 'playOnly');
       this.player.registerInputs();
     }
   }
@@ -98,7 +101,7 @@ export class Game {
   }
 
   newGame = () => {
-    if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
+    // if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
     this.canRestart = false;
     utils.resizeCanvas(); // covering all bases
     this.deltaTime = 0;
@@ -106,7 +109,7 @@ export class Game {
     this.pauseTime = null;
     this.gameOver = false;
     this.gameOverText = null;
-    this.timeToImpact = this.new ? 2500 : Math.max(utils.HAZARD_MIN_MS, 2000-this.score); // higher score = faster start
+    this.timeToImpact = this.getStartingTimeToImpact(); // must precede score reset
     this.score = 0;
     this.shots = 0;
     this.hits = 0;
@@ -127,6 +130,10 @@ export class Game {
     }
   }
 
+  getStartingTimeToImpact = () => {
+    return this.new ? 2000 : Math.max(utils.HAZARD_MIN_MS, 2000-this.score); // higher score = faster start
+  }
+
   createBgStars = () => {
     this.bgStars = [];
     for (let i = 0; i < 1000; i++) { 
@@ -134,14 +141,16 @@ export class Game {
         new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
                           utils.randomVal(-utils.canvas.height, utils.canvas.height*2)));
     }
-    // let yRange = (utils.canvas.height * 3) / utils.BG_RES;
-    // for (let i = 0; i < yRange; i++) {
-    //   for (let j = 0; j < utils.randomInt(0, 10); j++) {
-    //     this.bgStars.push(
-    //       new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
-    //                        (utils.randomVal(i, i+1) * utils.BG_RES)-utils.canvas.height));
-    //   }
-    // }
+  }
+
+  updateScrollPct = () => {
+    if (!this.gameOver) {
+      let targetPct = utils.HAZARD_MIN_MS / this.timeToImpact;
+      if (targetPct > this.scrollPct) this.scrollPct += utils.BG_SCROLL_ACC;
+    } else {
+      let targetPct = utils.HAZARD_MIN_MS / this.getStartingTimeToImpact();
+      if (this.scrollPct > targetPct) this.scrollPct -= utils.BG_SCROLL_ACC;
+    }
   }
 
   spawnHazard = () => { // spawns a new hazard then queues the next one on a decreasing timer
@@ -203,7 +212,7 @@ export class Game {
   }
 
   rankPlayer = () => {
-    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.7);
+    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.8);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';
@@ -275,20 +284,18 @@ export class Game {
       if (!this.paused) { // couldn't use _inBounds() since check is per-axis
         let moveX = 0 < this.player.loc.x && this.player.loc.x < utils.canvas.width;
         // let moveY = 0 < this.player.loc.y && this.player.loc.y < utils.canvas.height;
+        this.updateScrollPct();
+        let scroll = utils.BG_SCROLL_MAX * this.scrollPct;
         this.bgStars.forEach(point => { 
           if (moveX) { point.x -= this.player.vel.x * utils.PARALLAX; }
           // if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
-          point.y += Math.max(utils.BG_SCROLL, (this.score * 0.25 * utils.PARALLAX)) * utils.getScale(); // utils.BG_SCROLL; // TODO: SCALE ON MOBILE getScale??
-          // TODO:   ^ store this value in the class so it can be ramped down on game over
+          // point.y += Math.min(utils.BG_SCROLL_MAX, Math.max(utils.BG_SCROLL, (this.score*0.25*utils.PARALLAX))) * utils.getScale();
+          point.y += scroll * utils.getScale();
           if (point.y > utils.canvas.height*2) {
             point.y = (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height;
             point.x = utils.randomVal(-utils.canvas.width, utils.canvas.width*2);
           }
         });
-        // this.bgStars.pop();
-        // this.bgStars.push(
-        //   new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
-        //                    (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height));
       }
       utils.dotPoints(this.bgStars);
     }
@@ -323,10 +330,12 @@ export class Game {
             this.jingle = (utils.JINGLE_RANK_S);
             break;
         }
-        this.jingle.onended = (e) => { 
-          if (this.gameOver) utils.safeToggleAudio(utils.GAME_BGM);
+        this.jingle.onended = (event) => { 
+          if (this.gameOver && document.fullscreenElement) utils.safeToggleAudio(utils.GAME_BGM);
           this.canRestart = true;
+          this.jingle = null;
         };
+        this.jingle.onpause = (event) => { if (!this.canRestart) this.canRestart = true } // edge case when fullscreen lost during game over
         utils.safeToggleAudio(utils.GAME_BGM); // pause as late as possible to minimize audio gap
         utils.safePlayAudio(this.jingle);
       }
@@ -360,6 +369,7 @@ export class Game {
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
       if (!this.paused) {
+        if (this.jingle && this.jingle.paused && document.fullscreenElement) utils.safeToggleAudio(this.jingle, 'playOnly'); // edge case
         if (!this.gameOver && !document.hasFocus()) {
           if (utils.DEBUG) console.log('lost focus');
           this.handlePause();
@@ -378,7 +388,6 @@ export class Game {
           }
         }
       } else if (this.new) { // resolves bug where player would start at a corner/edge instead of mid-screen
-        // this.player.loc.update(utils.canvas.width, utils.canvas.height, 0.5);
         this.player.loc.x = utils.playerSpawnX();
         this.player.loc.y = utils.playerSpawnY();
         if (utils.MOBILE) this.player.tilt = this.player.neutral.copy();
