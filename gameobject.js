@@ -6,19 +6,23 @@ export class GameObject {
     this.loc = loc ? loc.copy() : new utils.Vector2();
     this.vel = vel ? vel.copy() : new utils.Vector2();
     this.objId = this.game.register(this);
-    this.radius = radius;
+    this.radius = radius * utils.getScale();
+    this.diameter = this.radius * 2;
     this.theta = theta;
     this.destroyed = false;
+    this.canDestroy = false; // flag to stop update loop from immediately destroying objects that spawn offscreen
     this.parentId = null;
   }
-  getRadius = () => { return utils.getScale() * this.radius } // wrapper to rescale on landscape-utils.MOBILE
-  inBounds = () => { return -this.getRadius() <= this.loc.x && this.loc.x <= utils.canvas.width+this.getRadius() 
-                         && -this.getRadius() <= this.loc.y && this.loc.y <= utils.canvas.height+this.getRadius() }
+  getRadius = () => { return this.radius }
+  inBounds = ()=> {
+    return -this.diameter < this.loc.x && this.loc.x < utils.canvas.width + this.diameter &&
+           -this.diameter < this.loc.y && this.loc.y < utils.canvas.height + this.diameter 
+  }
   _points = (shape) => { 
     var points = [];
     shape.forEach(point => {
-      var x = this.loc.x + this.getRadius() * Math.cos(point + this.theta);
-      var y = this.loc.y + this.getRadius() * Math.sin(point + this.theta);
+      var x = this.loc.x + this.radius * Math.cos(point + this.theta);
+      var y = this.loc.y + this.radius * Math.sin(point + this.theta);
       points.push(new utils.Vector2(x, y));
     });
     return points;
@@ -29,14 +33,17 @@ export class GameObject {
     if (!this.destroyed) { // prevent calls on the same frame from activating twice
       this.destroyed = true;
       this._onDestroy();
-      if (this.inBounds()) { this._onDestroyAnimate(); }
+      if (this.inBounds()) { this._onDestroyAnimate() }
       this.game.deregister(this.objId); // stop updating/rendering and queue for cleanup
     }
   }
   _onUpdate = () => {} // virtual, wraps update() 
   update = () => {
     this._onUpdate();
-    if (this.inBounds()) this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * utils.getScale());
+    if (this.inBounds() || !this.canDestroy) {
+      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * utils.getScale());
+      if (!this.canDestroy && this.inBounds()) this.canDestroy = true; // once it's in bounds for the first time, it can be destroyed
+    }
     else this.destroy();
   }
   render = () => {} // virtual
@@ -44,16 +51,12 @@ export class GameObject {
 
 export class Projectile extends GameObject {
   constructor(game, loc, theta) { super(game, loc, new utils.Vector2(Math.cos(theta), Math.sin(theta), utils.PROJ_V), 0, theta) }
-  update = () => {
+  _onUpdate = () => {
     let hit = this.game.checkHazardCollision(this);
-    if (!hit && this.inBounds()) {
-      this.loc.add(this.vel.x, this.vel.y, this.game.deltaTime * utils.getScale());
-    } else {
-      if (hit && hit.value) {
-        this.game.hits++;
-        this.game.score += hit.value;
-      }
-      this.destroy();
+    if (hit && hit.value) {
+      this.game.hits++;
+      this.game.score += hit.value;
+      this.canDestroy = true;
     }
   }
   render = () => { utils.tracePoints([this.loc, new utils.Vector2(this.loc.x-this.vel.x*utils.PROJ_L, this.loc.y-this.vel.y*utils.PROJ_L)], false, utils.PLAYER_C) }
