@@ -6,22 +6,22 @@ export class GameObject {
     this.loc = loc ? loc.copy() : new utils.Vector2();
     this.vel = vel ? vel.copy() : new utils.Vector2();
     this.objId = this.game.register(this);
-    this.radius = radius * utils.getScale();
+    this.radius = radius
     this.theta = theta;
     this.destroyed = false;
     this.canDestroy = false; // flag to stop update loop from immediately destroying objects that spawn offscreen
     this.parentId = null;
   }
-  getRadius = () => { return this.radius }
+  getRadius = () => { return this.radius * utils.getScale() }
   inBounds = ()=> {
-    return -this.radius < this.loc.x && this.loc.x < utils.canvas.width  + this.radius &&
-           -this.radius < this.loc.y && this.loc.y < utils.canvas.height + this.radius 
+    return -this.getRadius() < this.loc.x && this.loc.x < utils.canvas.width  + this.getRadius() &&
+           -this.getRadius() < this.loc.y && this.loc.y < utils.canvas.height + this.getRadius() 
   }
   _points = (shape) => { 
     var points = [];
     shape.forEach(point => {
-      var x = this.loc.x + this.radius * Math.cos(point + this.theta);
-      var y = this.loc.y + this.radius * Math.sin(point + this.theta);
+      var x = this.loc.x + this.getRadius() * Math.cos(point + this.theta);
+      var y = this.loc.y + this.getRadius() * Math.sin(point + this.theta);
       points.push(new utils.Vector2(x, y));
     });
     return points;
@@ -98,7 +98,6 @@ export class PlayerWeapon {
 
 export class Player extends GameObject {
   constructor(game) {
-    // utils.resizeCanvas(); // just in case
     super(game, new utils.Vector2(utils.playerSpawnX(), utils.playerSpawnY()));
     this.accel = utils.PLAYER_A;
     this.frict = utils.PLAYER_F;
@@ -185,7 +184,9 @@ export class Player extends GameObject {
   }
   update = () => {
     if (!this.firing && this._isTilted()) {
-      let newTheta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
+      let newTheta = this.loc.y < utils.canvas.height-this.getRadius() ?
+                     Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) : 
+                     -Math.PI * 0.5;
       let dt = newTheta - this.theta;
       if (dt > Math.PI) dt -= utils.PI_2;
       this.theta += 0.05 * dt;
@@ -202,8 +203,8 @@ export class Player extends GameObject {
     if (this._isTilted()) this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * utils.getScale()); // scale by 1/90 to normalize raw tilt input
     if (this.boosting) this.vel.add(Math.cos(this.theta), Math.sin(this.theta), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
-    this.loc.x = Math.max(this.radius, Math.min(this.loc.x + this.vel.x, utils.canvas.width -this.radius));
-    this.loc.y = Math.max(this.radius, Math.min(this.loc.y + this.vel.y, utils.canvas.height-this.radius));
+    this.loc.x = Math.max(this.getRadius(), Math.min(this.loc.x + this.vel.x, utils.canvas.width -this.getRadius()));
+    this.loc.y = Math.max(this.getRadius(), Math.min(this.loc.y + this.vel.y, utils.canvas.height-this.getRadius()));
     this.game.checkHazardCollision(this); // collision check
   }
   render = () => { utils.tracePoints(this._points(utils.TRIANGLE), true, this.color, this.color); } // TODO: change color based on upgrade level
