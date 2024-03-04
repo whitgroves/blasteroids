@@ -193,7 +193,11 @@ export class Game {
                  gameObj.parentId === collisionObj.objId || 
                  gameObj.objId === collisionObj.parentId)) return null;
             if (gameObj.isUpgrade && collisionObj.isHazard) return null;
-        if (!gameObj.isUpgrade) collisionObj.destroy();
+        if (!gameObj.isUpgrade) {
+          collisionObj.canDestroy = true;
+          collisionObj.destroy();
+        }
+        gameObj.canDestroy = true;
         gameObj.destroy();
         return gameObj;
       }
@@ -213,7 +217,7 @@ export class Game {
   }
 
   rankPlayer = () => {
-    let sharpshooter = (this.shots > 30 && this.hits >= this.shots); // * 0.8);
+    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.85);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';

@@ -7,7 +7,6 @@ export class GameObject {
     this.vel = vel ? vel.copy() : new utils.Vector2();
     this.objId = this.game.register(this);
     this.radius = radius * utils.getScale();
-    this.diameter = this.radius * 2;
     this.theta = theta;
     this.destroyed = false;
     this.canDestroy = false; // flag to stop update loop from immediately destroying objects that spawn offscreen
@@ -15,8 +14,8 @@ export class GameObject {
   }
   getRadius = () => { return this.radius }
   inBounds = ()=> {
-    return -this.diameter < this.loc.x && this.loc.x < utils.canvas.width + this.diameter &&
-           -this.diameter < this.loc.y && this.loc.y < utils.canvas.height + this.diameter 
+    return -this.radius < this.loc.x && this.loc.x < utils.canvas.width  + this.radius &&
+           -this.radius < this.loc.y && this.loc.y < utils.canvas.height + this.radius 
   }
   _points = (shape) => { 
     var points = [];
@@ -116,15 +115,12 @@ export class Player extends GameObject {
                    () => { return this.theta < 0 || this._isTilted() } :
                    () => { return this.boosting || this.theta < 0 };
     new ParticleTrailAnimation(game, this, null, (utils.MOBILE ? 4 : 8), animFunc);
-    // new ParticleTrailAnimation(game, this, null, 8, () => { return Math.abs(this.vel.x) >= utils.PLAYER_V_FLOOR || this.vel.y <= utils.PLAYER_V_FLOOR }); //this.boosting }); // || this._isTilted() });
-    // else new ParticleTrailAnimation(game, this, null, 4, () => { return this._isTilted() });
   }
   // generally, each event sets an update flag, then the response is handled during update()
   // otherwise we'd stall the game doing trig on every mouse move or keypress
   registerInputs = () => {
     if (utils.MOBILE) {
       window.addEventListener('touchstart', this._onTouchStart);
-      // window.addEventListener('touchend', this._onTouchEnd);
       window.addEventListener('deviceorientation', this._onDeviceOrientation);
     } else {
       window.addEventListener('mousemove', this._onMouseMove);
@@ -136,7 +132,6 @@ export class Player extends GameObject {
   deregisterInputs = () => {
     if (utils.MOBILE) { 
       window.removeEventListener('touchstart', this._onTouchStart);
-      // window.addEventListener('touchend', this._onTouchEnd);
       window.removeEventListener('deviceorientation', this._onDeviceOrientation);
     } else {
       window.removeEventListener('mousemove', this._onMouseMove);
@@ -150,9 +145,6 @@ export class Player extends GameObject {
     this.target = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.firing = true;
   }
-  // _onTouchEnd = (event) => {
-  //   this.target = null;
-  // }
   _onDeviceOrientation = (event) => {
     if (!this.game.paused) {
       let beta = Math.max(-90, Math.min(event.beta, 90)); // [-180, 180) -> clamp to [-90, 90)
@@ -198,7 +190,6 @@ export class Player extends GameObject {
       if (dt > Math.PI) dt -= utils.PI_2;
       this.theta += 0.05 * dt;
     }
-    // if (!this.firing && this._isTilted()) this.theta = Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x);
     if (this.target) this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
     this.theta %= utils.PI_2; // radians
     if (this.firing) { // fire projectile
@@ -211,8 +202,8 @@ export class Player extends GameObject {
     if (this._isTilted()) this.vel.add(this.tilt.x-this.neutral.x, this.tilt.y-this.neutral.y, this.accel * this.game.deltaTime * 0.0111 * utils.getScale()); // scale by 1/90 to normalize raw tilt input
     if (this.boosting) this.vel.add(Math.cos(this.theta), Math.sin(this.theta), this.accel * this.game.deltaTime);
     this.vel.apply(this._safeUpdateVelocity);
-    this.loc.x = Math.max(0, Math.min(this.loc.x + this.vel.x, utils.canvas.width));
-    this.loc.y = Math.max(0, Math.min(this.loc.y + this.vel.y, utils.canvas.height));
+    this.loc.x = Math.max(this.radius, Math.min(this.loc.x + this.vel.x, utils.canvas.width -this.radius));
+    this.loc.y = Math.max(this.radius, Math.min(this.loc.y + this.vel.y, utils.canvas.height-this.radius));
     this.game.checkHazardCollision(this); // collision check
   }
   render = () => { utils.tracePoints(this._points(utils.TRIANGLE), true, this.color, this.color); } // TODO: change color based on upgrade level
@@ -315,7 +306,7 @@ export class Comet extends Asteroid2 {
   }
   _onDestroyAnimate = () => { new ExplosionAnimation(this.game, this.loc, this.color, this.getRadius()*7); }
   _onDestroyAudio = () => {
-    utils.COMET_SFX_0.muted = true; // force whoosh sound to stop
+    if (!utils.COMET_SFX_0.muted) utils.COMET_SFX_0.muted = true; // force whoosh sound to stop
     // utils.safeToggleAudio(utils.COMET_SFX_0, 'pauseOnly');
     utils.safePlayAudio(utils.COMET_SFX_1);
   }
@@ -323,7 +314,7 @@ export class Comet extends Asteroid2 {
     this.game.checkHazardCollision(this);
     this.theta += this._turnAmt;
     this.vel.update(Math.cos(this.theta), Math.sin(this.theta), utils.COMET_V);
-    utils.COMET_SFX_0.muted = false;
+    if (utils.COMET_SFX_0.muted) utils.COMET_SFX_0.muted = false;
   }
 }
 
