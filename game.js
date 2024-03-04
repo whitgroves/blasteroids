@@ -137,10 +137,14 @@ export class Game {
 
   createBgStars = () => {
     this.bgStars = [];
-    for (let i = 0; i < 1000; i++) { 
-      this.bgStars.push(
-        new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
-                          utils.randomVal(-utils.canvas.height, utils.canvas.height*2)));
+    this.bgStars2 = [];
+    this.bgStars3 = [];
+    for (let i = 0; i < 1000; i++) {
+      //this.bgStars.push(
+      let star = new utils.Vector2(utils.randomVal(-utils.canvas.width, utils.canvas.width*2),
+                                   utils.randomVal(-utils.canvas.height, utils.canvas.height*2)); //);
+      let layer = utils.randomChoice([this.bgStars, this.bgStars2, this.bgStars3]);
+      layer.push(star);
     }
   }
 
@@ -217,7 +221,7 @@ export class Game {
   }
 
   rankPlayer = () => {
-    let sharpshooter = (this.shots > 30 && this.hits >= this.shots * 0.85);
+    let sharpshooter = (this.hits >= this.shots);
     let pacifist = (this.shots === 0);
     // D rank
     this.rank = 'D';
@@ -282,6 +286,17 @@ export class Game {
     }
   }
 
+  _updateStarPoints = (point, moveX, scroll, parallax) => {
+    if (moveX) { point.x -= this.player.vel.x * utils.PARALLAX_SCALE; }
+    // if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
+    // point.y += Math.min(utils.BG_SCROLL_MAX, Math.max(utils.BG_SCROLL, (this.score*0.25*utils.PARALLAX))) * utils.getScale();
+    point.y += scroll * parallax * utils.getScale();
+    if (point.y > utils.canvas.height*2) {
+      point.y = (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height;
+      point.x = utils.randomVal(-utils.canvas.width, utils.canvas.width*2);
+    }
+  }
+
   render = () => {
     utils.resizeCanvas(); // done each frame in case the window is resized
     utils.ctx.clearRect(0, 0, utils.canvas.width, utils.canvas.height);
@@ -291,18 +306,23 @@ export class Game {
         // let moveY = 0 < this.player.loc.y && this.player.loc.y < utils.canvas.height;
         this.updateScrollPct();
         let scroll = utils.BG_SCROLL_MAX * this.scrollPct;
-        this.bgStars.forEach(point => { 
-          if (moveX) { point.x -= this.player.vel.x * utils.PARALLAX; }
-          // if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
-          // point.y += Math.min(utils.BG_SCROLL_MAX, Math.max(utils.BG_SCROLL, (this.score*0.25*utils.PARALLAX))) * utils.getScale();
-          point.y += scroll * utils.getScale();
-          if (point.y > utils.canvas.height*2) {
-            point.y = (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height;
-            point.x = utils.randomVal(-utils.canvas.width, utils.canvas.width*2);
-          }
-        });
+        // this.bgStars.forEach(point => { 
+        //   if (moveX) { point.x -= this.player.vel.x * utils.PARALLAX; }
+        //   // if (moveY) { point.y -= this.player.vel.y * utils.PARALLAX; }
+        //   // point.y += Math.min(utils.BG_SCROLL_MAX, Math.max(utils.BG_SCROLL, (this.score*0.25*utils.PARALLAX))) * utils.getScale();
+        //   point.y += scroll * utils.getScale();
+        //   if (point.y > utils.canvas.height*2) {
+        //     point.y = (utils.randomVal(0, 1) * utils.BG_RES)-utils.canvas.height;
+        //     point.x = utils.randomVal(-utils.canvas.width, utils.canvas.width*2);
+        //   }
+        // });
+        this.bgStars.forEach(point => this._updateStarPoints(point, moveX, scroll, 1));
+        this.bgStars2.forEach(point => this._updateStarPoints(point, moveX, scroll, 0.8));
+        this.bgStars3.forEach(point => this._updateStarPoints(point, moveX, scroll, 0.5));
       }
-      utils.dotPoints(this.bgStars);
+      utils.dotPoints(this.bgStars, utils.LINE_COLOR);
+      utils.dotPoints(this.bgStars2, utils.fadeColor(utils.LINE_COLOR, 0.8));
+      utils.dotPoints(this.bgStars3, utils.fadeColor(utils.LINE_COLOR, 0.5));
     }
     this.gameObjects.forEach((gameObj) => { gameObj.render() });
     let padding = utils.PADDING * utils.getScale() * (utils.MOBILE ? 3 : 1);
