@@ -140,7 +140,6 @@ export class Player extends GameObject {
     }
   }
   _onTouchStart = (event) => {
-    event.preventDefault();
     this.target = new utils.Vector2(event.touches[0].clientX, event.touches[0].clientY);
     this.firing = true;
   }

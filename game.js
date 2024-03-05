@@ -27,7 +27,7 @@ export class Game {
     if (!this.waitingForDoubleTap) {
       this.waitingForDoubleTap = true;
       setTimeout(() => { this.waitingForDoubleTap = false }, utils.DTAP_TIMEOUT);
-    } else if (this.paused && !this.new) { // recalibrate
+    } else if (!this.gameOver && this.paused && !this.new) { // recalibrate
       this.player.neutral = null; // neutral pos will reset on resume
       utils.safePlayAudio(utils.PAUSE_SFX); // audio cue
     }
@@ -221,13 +221,12 @@ export class Game {
   }
 
   rankPlayer = () => {
-    let sharpshooter = (this.hits >= this.shots);
     let pacifist = (this.shots === 0);
+    let sharpshooter = (this.hits >= this.shots) && !pacifist;
     // D rank
     this.rank = 'D';
-    let commentPool = ["MIX IT UP A LIL' BIT", 'STAY IN SCHOOL', 'I BELIEVE IN YOU',
-                       'SKILL ISSUE', 'TRY HARDER', 'JUST SAY NO'];
-    if (pacifist) commentPool = [(utils.MOBILE ? 'TAP' : 'CLICK') + ' TO SHOOT', 'DO A BARREL ROLL'];
+    let commentPool = ['STAY IN SCHOOL', 'SKILL ISSUE', 'JUST SAY NO', 'DO A BARREL ROLL'];
+    if (pacifist && this.score >= 10) commentPool = ['I BELIEVE IN YOU', "MIX IT UP A LIL BIT"];
     // C rank
     if (sharpshooter && this.score >= 30) {
       this.rank = 'C';
