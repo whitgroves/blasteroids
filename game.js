@@ -101,7 +101,7 @@ export class Game {
   }
 
   newGame = () => {
-    // if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle ASAP on early reset
+    if (this.jingle && !this.jingle.paused) utils.safeToggleAudio(this.jingle); // stop rank jingle on early reset
     this.canRestart = false;
     utils.resizeCanvas(); // covering all bases
     this.deltaTime = 0;
