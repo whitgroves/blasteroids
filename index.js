@@ -13,15 +13,15 @@ document.getElementById("tagline").innerHTML = utils.randomChoice([
     `actually garbage`,
     `not affiliated with the 1987 sequel`,
   ])
-]);
+]); // TODO - load these in from a text file
 
 const game = new Game();
 const userEvent = utils.MOBILE ? 'touchend' : 'click';
+var wakeLock = null;
 
 const handleFullscreen = (event) => {
   if (!document.fullscreenElement) {
-    utils.canvas.requestFullscreen()
-      .then(() => {
+    utils.canvas.requestFullscreen().then(() => {
         if (utils.MOBILE) screen.orientation.lock('landscape');
         utils.canvas.style.borderWidth = "0px";
       }).catch(err => utils.MOBILE ? alert(err) : console.log(err));
@@ -45,12 +45,23 @@ const handleScreenChange = () => {
   else if (!game.paused) game.handlePause();
 }
 
-addEventListener('fullscreenchange', (event) => {
+addEventListener('fullscreenchange', async (event) => {
   if (!document.fullscreenElement) {
     utils.canvas.addEventListener(userEvent, handleFullscreen);
     if (game.new) utils.safeToggleAudio(utils.TITLE_BGM, 'pauseOnly');
     handleScreenChange();
     utils.canvas.style.borderWidth = "1px";
+    if (wakeLock && !wakeLock.released) wakeLock.release().then(() => { 
+      wakeLock = null; 
+      // console.log('lock released'); 
+    });
+  } else if (utils.MOBILE && "wakeLock" in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request();
+      // console.log('lock obtained');
+    } catch (err) {
+      console.log(err);
+    }
   }
 });
 
