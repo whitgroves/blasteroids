@@ -4,7 +4,6 @@ import { Game } from "./game.js";
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
-document.getElementById("intro-text").innerText = `↓ ${(utils.MOBILE ? "tap" : "click")} to play ↓`;
 document.getElementById("tagline").innerHTML = utils.randomChoice([
   `now with ${utils.randomInt(0, 255)}% more rng`,
   `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", "hand sanitizer"])}`,
@@ -14,6 +13,13 @@ document.getElementById("tagline").innerHTML = utils.randomChoice([
     `not affiliated with the 1987 sequel`,
   ])
 ]); // TODO - load these in from a text file
+
+let bgmBuffer = null;
+setTimeout(() => { 
+  if (!bgmBuffer && utils.MOBILE) document.getElementById("intro-text").innerHTML = `<i>taking a while? try it on wi-fi</i>`;
+}, 30000);
+bgmBuffer = await utils.loadAudio("./sfx/436507__doctor_dreamchip__2018-08-02.wav"); // anti-pattern but for now ensures bgm is fully loaded
+document.getElementById("intro-text").innerHTML = `↓ ${(utils.MOBILE ? "tap" : "click")} to play ↓`;
 
 const game = new Game();
 const userEvent = utils.MOBILE ? 'touchend' : 'click';

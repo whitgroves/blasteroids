@@ -217,6 +217,21 @@ export const safeToggleAudio = (audio, mode='auto') => {
     else if (mode !== 'playOnly') { audio.pause() }
   }
 }
+// WIP: buffered audio
+export const audioCtx = new AudioContext();
+export const loadAudio = async (filepath) => {
+  const response = await fetch(filepath);
+  const arrayBuffer = await response.arrayBuffer();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  return audioBuffer;
+}
+// export const playBufferedAudio = (audioBuffer, loopAudio=false) => {
+//   const audioSource = new AudioBufferSourceNode(audioCtx, { buffer: audioBuffer, loop: loopAudio });
+//   audioSource.connect(audioCtx.destination);
+//   audioSource.start();
+//   console.log(audioSource);
+// }
+// export const BGM_BUFFER = await loadAudio(audioCtx, "./sfx/436507__doctor_dreamchip__2018-08-02.wav");
 
 // rng
 export const randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
