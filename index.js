@@ -6,8 +6,20 @@ const arrival = Date.now();
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
-var game = null;
+fetch('./taglines.txt') // https://stackoverflow.com/a/49680132/3178898
+  .then(response => response.text())
+  .then(data => {
+    let taglines = [
+      `now with ${utils.randomInt(0, 255)}% more rng`,
+      `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", 
+                                                  "microdosing", "hand sanitizer", "stuffed crust", "free nights and weekends"])}`,
+      utils.randomChoice(data.split('\n'))
+    ];
+    // taglines = taglines.concat(data.split('\n'));
+    document.getElementById("tagline").innerHTML = utils.randomInt(1, 10**9) === 1 ? "one in a billion" : utils.randomChoice(taglines);
+  });
 
+var game = null;
 const gameStart = () => {
   if (game) return;
   game = new Game();
@@ -100,7 +112,6 @@ const onAudioEvent = (event) => {
 }
 
 const loadAudio = (audioElement) => {
-  // if (!audioElement.duration || audioElement.duration > (audioElement.buffered.end(0) + 10)) { // 10s leeway
   if (audioElement.readyState < 4) {
     audioElement.addEventListener("loadstart", onAudioEvent);
     audioElement.addEventListener("progress", onAudioEvent);
@@ -121,17 +132,3 @@ const loadAudio = (audioElement) => {
 
 loadAudio(utils.TITLE_BGM);
 loadAudio(utils.GAME_BGM);
-// setTimeout(() => onFileLoaded(true), 7000); // if it's not loaded in ~10s it won't buffer until the user starts the game
-
-fetch('./taglines.txt') // https://stackoverflow.com/a/49680132/3178898
-  .then(response => response.text())
-  .then(data => {
-    let taglines = [
-      `now with ${utils.randomInt(0, 255)}% more rng`,
-      `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", 
-                                                  "microdosing", "hand sanitizer", "stuffed crust", "doomscrolling", 
-                                                  "Hanna-Barbera", "free nights and weekends"])}`
-    ];
-    taglines = taglines.concat(data.split('\n'));
-    document.getElementById("tagline").innerHTML = utils.randomInt(1, 10**9) === 1 ? "one in a billion" : utils.randomChoice(taglines);
-  });
