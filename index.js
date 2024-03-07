@@ -4,22 +4,56 @@ import { Game } from "./game.js";
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
+if (utils.DEBUG) {
+  const arrival = Date.now();
+  const expected = 2;
+  var loaded = 0;
+  const onFileLoaded = () => {
+    loaded += 1;
+    if (loaded >= expected) document.getElementById("intro-text").innerHTML = `↓ ${(utils.MOBILE ? "tap" : "click")} to play ↓`;
+  }
+  const onAudioEvent = (event) => { 
+    if (utils.DEBUG) console.log(`AudioFile: ${event.target.id} | ` + 
+                                 `WaitTime: ${((Date.now()-arrival)/1000).toFixed(3)}s | ` + 
+                                 `Event: ${event.type} | ` +
+                                 `NetworkState: ${event.target.networkState} | ` + 
+                                 `ReadyState: ${event.target.readyState} | ` + 
+                                 `BufferEnd: ${(event.target.duration ? event.target.buffered.end(0) : "NaN")}\n`);
+    if (event.type === 'canplaythrough' && event.target.duration > (event.target.buffered.end(0) + 10)) onFileLoaded();
+  }
+  const debugAudio = (audioElement) => {
+    if (!audioElement.duration || audioElement.duration > (audioElement.buffered.end(0) + 10)) { // 10s leeway
+      audioElement.addEventListener("loadstart", onAudioEvent);
+      audioElement.addEventListener("progress", onAudioEvent);
+      audioElement.addEventListener("waiting", onAudioEvent);
+      audioElement.addEventListener("stalled", onAudioEvent);
+      audioElement.addEventListener("suspend", onAudioEvent);
+      audioElement.addEventListener("canplay", onAudioEvent);
+      audioElement.addEventListener("canplaythrough", onAudioEvent);
+      audioElement.addEventListener("error", onAudioEvent);
+      audioElement.addEventListener("emptied", onAudioEvent); // triggered on .load()
+      if (audioElement.networkState < 2)  audioElement.load(); // force load for progress check; otherwise browser may wait
+      else console.log(`${audioElement.id} already loading... | Audio Duration: ${audioElement.duration.toFixed(2)}s`);
+    } else {
+      console.log(`${audioElement.id} was pre-loaded | Audio Duration ${audioElement.duration.toFixed(2)}s`);
+      onFileLoaded();
+    }
+  }
+  debugAudio(utils.TITLE_BGM);
+  debugAudio(utils.GAME_BGM);
+}
+
 document.getElementById("tagline").innerHTML = utils.randomChoice([
   `now with ${utils.randomInt(0, 255)}% more rng`,
-  `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", "hand sanitizer"])}`,
+  `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", "microdosing",
+                                              "hand sanitizer", "stuffed crust", "doomscrolling", "free nights and weekends"])}`,
   utils.randomChoice([
     `"works on my machine" ¯\\_(ツ)_/¯`,
     `actually garbage`,
     `not affiliated with the 1987 sequel`,
+    `a byproduct of coffee and unemployment`,
   ])
 ]); // TODO - load these in from a text file
-
-let bgmBuffer = null;
-setTimeout(() => { 
-  if (!bgmBuffer && utils.MOBILE) document.getElementById("intro-text").innerHTML = `<i>taking a while? try it on wi-fi</i>`;
-}, 30000);
-bgmBuffer = await utils.loadAudio("./sfx/436507__doctor_dreamchip__2018-08-02.wav"); // anti-pattern but for now ensures bgm is fully loaded
-document.getElementById("intro-text").innerHTML = `↓ ${(utils.MOBILE ? "tap" : "click")} to play ↓`;
 
 const game = new Game();
 const userEvent = utils.MOBILE ? 'touchend' : 'click';
@@ -59,12 +93,12 @@ addEventListener('fullscreenchange', async (event) => {
     utils.canvas.style.borderWidth = "1px";
     if (wakeLock && !wakeLock.released) wakeLock.release().then(() => { 
       wakeLock = null; 
-      // console.log('lock released'); 
+      if (utils.DEBUG) console.log('lock released'); 
     });
   } else if (utils.MOBILE && "wakeLock" in navigator) {
     try {
       wakeLock = await navigator.wakeLock.request();
-      // console.log('lock obtained');
+      if (utils.DEBUG) console.log('lock obtained');
     } catch (err) {
       console.log(err);
     }

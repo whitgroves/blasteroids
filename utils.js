@@ -1,8 +1,8 @@
 export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
-export const DEBUG = false; //JSON.parse(document.getElementById('debugFlag').text).isDebug;
-export const BUILD = '2024.03.02.0357';
+export const DEBUG = true;
+export const BUILD = '2024.03.06.1846';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -204,12 +204,13 @@ export const safePlayAudio = (audio) => {
   if (audio) { // make sure file is actually loaded first
     audio.pause(); // https://stackoverflow.com/q/14834520
     audio.currentTime = 0;
-    // audio.muted = false;
+    // audio.muted = false; // TODO -> find out what this breaks
     audio.play();
   }
 }
 export const safeToggleAudio = (audio, mode='auto') => {
   if (audio) {
+    if (DEBUG && audio.id === "gameBgm") console.log(`toggling gameBgm, mode=${mode}`)
     if (audio.paused && mode !== 'pauseOnly') { 
       if (audio.ended) audio.currentTime = 0;
       audio.play();
@@ -217,21 +218,6 @@ export const safeToggleAudio = (audio, mode='auto') => {
     else if (mode !== 'playOnly') { audio.pause() }
   }
 }
-// WIP: buffered audio
-export const audioCtx = new AudioContext();
-export const loadAudio = async (filepath) => {
-  const response = await fetch(filepath);
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  return audioBuffer;
-}
-// export const playBufferedAudio = (audioBuffer, loopAudio=false) => {
-//   const audioSource = new AudioBufferSourceNode(audioCtx, { buffer: audioBuffer, loop: loopAudio });
-//   audioSource.connect(audioCtx.destination);
-//   audioSource.start();
-//   console.log(audioSource);
-// }
-// export const BGM_BUFFER = await loadAudio(audioCtx, "./sfx/436507__doctor_dreamchip__2018-08-02.wav");
 
 // rng
 export const randomChoice = (choices) => { return choices[Math.floor(Math.random() * choices.length)] }
