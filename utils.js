@@ -1,7 +1,7 @@
 export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
-export const DEBUG = true;
+export const DEBUG = false;
 export const BUILD = '2024.03.06.1846';
 
 // const USER_CONFIG = document.cookie.split(";");
