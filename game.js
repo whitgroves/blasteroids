@@ -1,5 +1,5 @@
 import * as utils from "./utils.js";
-import { Player, Asteroid2, Comet, UFO, Upgrade } from "./gameobject.js";
+import { Player, Asteroid, Comet, UFO, Upgrade } from "./gameobject.js";
 
 export class Game {
 
@@ -110,7 +110,7 @@ export class Game {
     this.gameOver = false;
     this.gameOverText = null;
     this.timeToImpact = this.getStartingTimeToImpact(); // must precede score reset
-    this.score = utils.DEBUG ? 200 : 0;
+    this.score = utils.DEBUG ? 60 : 0;
     this.shots = 0;
     this.hits = 0;
     this.rank = null;
@@ -167,17 +167,17 @@ export class Game {
         spawnClass = Upgrade;
         this.upgradeInPlay = true;
       } else if (this.score > 300) {
-        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Comet, UFO, UFO, UFO]);
+        spawnClass = utils.randomChoice([Asteroid, Asteroid, Comet, UFO, UFO, UFO]);
       } else if (this.score > 200) {
-        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Comet, UFO]);
+        spawnClass = utils.randomChoice([Asteroid, Asteroid, Comet, UFO]);
       } else if (this.score > 150) {
-        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Comet, Comet]);
+        spawnClass = utils.randomChoice([Asteroid, Asteroid, Asteroid, Comet, Comet]);
       } else if (this.score > 100) {
-        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Comet]);
+        spawnClass = utils.randomChoice([Asteroid, Asteroid, Asteroid, Comet]);
       } else if (this.score > 50) {
-        spawnClass = utils.randomChoice([Asteroid2, Asteroid2, Asteroid2, Asteroid2, Asteroid2, Comet]);
+        spawnClass = utils.randomChoice([Asteroid, Asteroid, Asteroid, Asteroid, Asteroid, Comet]);
       } else {
-        spawnClass = Asteroid2;
+        spawnClass = Asteroid;
       }
       new spawnClass(this, utils.randomSpawn());
       this.timeToImpact = Math.max(utils.HAZARD_MIN_MS, this.timeToImpact-Math.max(25, this.score));
@@ -366,7 +366,7 @@ export class Game {
       if (utils.GAME_BGM.volume > 0.005) { if (this.canRestart) utils.GAME_BGM.volume -= 0.0007; } // fade out
       else { 
         utils.GAME_BGM.volume = 0;
-        utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly'); // after full fade out, pause flag is used to restart bgm
+        if (!utils.GAME_BGM.paused) utils.safeToggleAudio(utils.GAME_BGM, 'pauseOnly'); // after full fade out, pause flag is used to restart bgm
       }
       utils.displayTextBox(this.gameOverText, utils.canvas.width * 0.5, utils.canvas.height * 0.5);
     }
@@ -393,7 +393,7 @@ export class Game {
   run = (timestamp) => { // https://isaacsukin.com/news/2015/01/detailed-explanation-javascript-game-loops-and-timing
     try {
       if (!this.paused) {
-        if (this.jingle && this.jingle.paused && document.fullscreenElement) utils.safeToggleAudio(this.jingle, 'playOnly'); // edge case
+        if (this.jingle && this.jingle.paused && !this.jingle.ended && document.fullscreenElement) utils.safeToggleAudio(this.jingle, 'playOnly'); // edge case
         if (!this.gameOver && !document.hasFocus()) {
           if (utils.DEBUG) console.log('lost focus');
           this.handlePause();

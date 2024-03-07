@@ -1,8 +1,8 @@
 export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
-export const DEBUG = false;
-export const BUILD = '2024.03.06.1846';
+export const DEBUG = true;
+export const BUILD = '2024.03.07.1313';
 
 // const USER_CONFIG = document.cookie.split(";");
 // const safeGetSetting = (settingName) => {
@@ -88,13 +88,11 @@ BOOM_SFX_2.volume = 0.4;
 export const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 export const ROCK_R = PLAYER_R * 2;
 export const ROCK_R_DIV = 1 / ROCK_R;
-export const ROCK_R_MIN = ROCK_R * 0.9; // edge case on larger asteroid breakup
-export const ROCK_R_MAX = ROCK_R * 2.7;   // cap the largest asteroids
+export const ROCK_R_MIN = ROCK_R * 0.9; 
+export const ROCK_R_MAX = ROCK_R * 3.0; // cap the largest asteroids
 export const ROCK_V = 0.3;
 export const ROCK_C = '#FFF'
-
-// big asteroid
-export const BIGROCK_R = ROCK_R * 2
+export const BIGROCK_R = ROCK_R_MIN * 1.5;
 
 // upgrade
 export const HEXAGON = [(Math.PI / 6), (Math.PI / 2), (5 * Math.PI / 6), (7 * Math.PI / 6), (3 * Math.PI / 2), (11 * Math.PI / 6)];
@@ -128,7 +126,7 @@ UFO_SFX_1.volume = .5;
 // display
 // var halfWidth = canvas.width * 0.5;
 var halfHeight = canvas.height * 0.5;
-const baseScale = MOBILE ? 0.35 : 1;
+const baseScale = MOBILE ? 0.32 : 1;
 const miniScale = MOBILE ? 3 : 1.25; // upscale for when game isn't fullscreen
 export const getScale = () => { return baseScale * (document.fullscreenElement ? 1 : miniScale) };
 export const getLineWidth = () => { return (!MOBILE ? 2 : 2.5) };

@@ -232,20 +232,20 @@ export class Hazard extends GameObject {
   render = () => { utils.tracePoints(this._points(this.shape), this.shape, this.color); } // using this.shape as enclose flag
 }
 
-export class Asteroid2 extends Hazard {
+export class Asteroid extends Hazard {
   constructor(game, loc, theta=null, vscale=null, radius=null, shape=null, color=null, value=null) {
-    let sizeCap = (game.score > 25 ? 3 : game.score > 3 ? 2 : 1);
+    let sizeCap = (game.score > 60 ? 3 : game.score > 3 ? 2 : 1);
     let grade = radius ? Math.max(1, Math.floor(radius*utils.ROCK_R_DIV)) : utils.randomInt(1, sizeCap);
-    radius = (radius || utils.ROCK_R * grade) * (1 + utils.randomVal(-0.1, 0.1));
-    radius = Math.min(radius, utils.ROCK_R_MAX);
-    vscale = (vscale || utils.ROCK_V) * (1 + utils.randomVal(-0.15 * grade, 0));
+    radius = radius || Math.max(Math.min(utils.ROCK_R * grade * (1 + utils.randomVal(-0.1, 0.1)), utils.ROCK_R_MAX), utils.ROCK_R_MIN);
+    vscale = vscale || utils.ROCK_V * (1 + utils.randomVal(-0.2*grade, -0.1*(grade-1)));
     shape = shape || utils.OCTAGON;
     color = color || utils.ROCK_C;
     value = value || 1;
     super(game, loc, vscale, theta, radius, shape, color, value);
     this.shape = this.shape.map(x => x += utils.randomVal(-2, 2) / shape.length);
     this.vscale = vscale;
-    this.isBig = radius > utils.ROCK_R * 1.5; // tried grade > 1 instead, but this approach enables multi-hit asteroids
+    this.isBig = radius > utils.BIGROCK_R; // utils.ROCK_R * 1.5; // tried grade > 1 instead, but this approach enables multi-hit asteroids
+    // this.grade = grade;
   }
   _onDestroyAudio = () => {
     if (this.isBig) utils.safePlayAudio(utils.BOOM_SFX_1);
@@ -253,21 +253,27 @@ export class Asteroid2 extends Hazard {
   }
   _onDestroyHazard = () => {
     if (this.isBig && this.inBounds()) {
-      let flipTheta = utils.randomChoice([true, false]);
       let remainingRadius = this.radius;
       let loops = 0;
-      let chunks = Math.floor(this.radius*utils.ROCK_R_DIV);
-      while (remainingRadius >= utils.ROCK_R && loops < chunks) {
-        let newRadius = Math.max(utils.randomVal(utils.ROCK_R, remainingRadius-utils.ROCK_R), utils.ROCK_R);
-        remainingRadius -= newRadius;
-        let theta = this.theta + (chunks === 1 ? 0 : ((flipTheta ? -1 : 1) * Math.PI * (loops+1 % 3 === 0 ?
-                                                                                        utils.randomVal(-0.125, 0.125) : 
-                                                                                        utils.randomVal(0.1667, 0.25))));
-        let asteroid = new Asteroid2(this.game, this.loc.copy(), theta, this.vscale*(1-utils.randomVal(0,0.1)), newRadius);
+      let chunks = [];
+      let maxChunks = Math.floor(this.radius*utils.ROCK_R_DIV);
+      while (remainingRadius >= utils.ROCK_R && loops < Math.floor(this.radius*utils.ROCK_R_DIV)) {
+        // let radius = Math.min(utils.randomVal(utils.ROCK_R_MIN, Math.max(remainingRadius, utils.ROCK_R_MIN)), utils.BIGROCK_R);
+        let radius = Math.max(Math.min(utils.randomVal(0, remainingRadius), remainingRadius*(1-(++loops/maxChunks))), utils.ROCK_R_MIN);
+        remainingRadius -= radius;
+        chunks.push(radius);
+      }
+      let flipTheta = utils.randomChoice([true, false]);
+      chunks.forEach((radius, index) => {
+        let theta = this.theta + (chunks.length === 1 ? 0 : ((flipTheta ? -1 : 1) * Math.PI * 
+                                                             ((index+1) % 3 === 0 ? utils.randomVal(-0.125, 0.125) 
+                                                                                : utils.randomVal(0.1667, 0.25))));
+        let asteroid = new Asteroid(this.game, this.loc.copy(), theta, 
+                                     this.vscale * (1-utils.randomVal(0, 0.1*(chunks.length))), radius);
         asteroid.parentId = this.objId;
         flipTheta = !flipTheta;
         loops++;
-      }
+      })
     }
   }
 }
@@ -297,7 +303,7 @@ export class Upgrade extends Hazard { // not really a hazard but behavior is 90%
   }
 }
 
-export class Comet extends Asteroid2 {
+export class Comet extends Asteroid {
   constructor(game, loc) {
     super(game, loc, null, utils.COMET_V, utils.COMET_R, utils.PENTAGON, utils.COMET_C, 7);
     this._turnAmt = utils.randomVal(-utils.COMET_TA, utils.COMET_TA); // follows a random arc
