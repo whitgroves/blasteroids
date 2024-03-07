@@ -1,7 +1,7 @@
 export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
-export const DEBUG = true;
+export const DEBUG = false;
 export const BUILD = '2024.03.07.1313';
 
 // const USER_CONFIG = document.cookie.split(";");
@@ -30,8 +30,8 @@ export const FONT_FAM = 'monospace';
 export const PADDING = 10;
 export const XSCALE_F = MOBILE ? 0.318 : 0.3225; // helps scale text box to font size
 export const YSXALE_F = MOBILE ? 0.645 : 0.7143; // don't ask me why, it just works
-export const PARALLAX_SCALE = 0.2;                     // ratio for parallax effect
-export const BG_RES = 8;                        // y-pixels to skip when drawing bg stars
+export const PARALLAX_SCALE = MOBILE ? 0.1 : 0.2;                     // ratio for parallax effect
+export const BG_RES = MOBILE ? 6 : 8;                        // y-pixels to skip when drawing bg stars
 export const BG_SCROLL = BG_RES * 0.25;
 export const BG_SCROLL_MAX = BG_RES * 0.5; // * 1.5; // even 1x is nauseating
 export const BG_SCROLL_ACC = MOBILE ? 0.005 : 0.01;         // rate the scroll changes per frame
@@ -59,11 +59,11 @@ export const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 export const PLAYER_R = MOBILE ? 20 : 16;     // radius
 export const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 export const PLAYER_V_FLOOR = 0.01;           // vel min before damping to 0
-export const PLAYER_A = MOBILE ? 0.06 : 0.02; // acceleration
+export const PLAYER_A = MOBILE ? 0.08 : 0.02; // acceleration
 export const PLAYER_F = 0.02;                 // friction
 export const PLAYER_C = DEBUG ? '#0FF' : '#0AA';
 export const playerSpawnX = () => { return canvas.width * 0.5 }
-export const playerSpawnY = () => { return canvas.height * 0.8 }
+export const playerSpawnY = () => { return canvas.height * 0.75 }
 
 // player weapon
 export const MAX_WEAPON_LVL = 4;
@@ -88,9 +88,9 @@ BOOM_SFX_2.volume = 0.4;
 export const OCTAGON = [0, (Math.PI / 4), (Math.PI / 2), (3 * Math.PI / 4), Math.PI, (5 * Math.PI / 4), (3 * Math.PI / 2), (7 * Math.PI / 4)];
 export const ROCK_R = PLAYER_R * 2;
 export const ROCK_R_DIV = 1 / ROCK_R;
-export const ROCK_R_MIN = ROCK_R * 0.9; 
+export const ROCK_R_MIN = ROCK_R; // * 0.9; 
 export const ROCK_R_MAX = ROCK_R * 3.0; // cap the largest asteroids
-export const ROCK_V = 0.3;
+export const ROCK_V = MOBILE ? 0.4 : 0.3;
 export const ROCK_C = '#FFF'
 export const BIGROCK_R = ROCK_R_MIN * 1.5;
 

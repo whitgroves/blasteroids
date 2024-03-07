@@ -111,7 +111,7 @@ export class Player extends GameObject {
     this.weapon = new PlayerWeapon();
     this.color = utils.PLAYER_C;
     let animFunc = utils.MOBILE ?
-                   () => { return this.theta < 0 || this._isTilted() } :
+                   () => { return this.theta < 0 || Math.abs(this.tilt.x-this.neutral.x) > 45 || Math.abs(this.tilt.y-this.neutral.y) > 45 } :
                    () => { return this.boosting || this.theta < 0 };
     new ParticleTrailAnimation(game, this, null, (utils.MOBILE ? 4 : 8), animFunc);
   }
@@ -183,12 +183,12 @@ export class Player extends GameObject {
   }
   update = () => {
     if (!this.firing && this._isTilted()) {
-      let newTheta = this.loc.y < utils.canvas.height-this.getRadius() ?
-                     Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) : 
-                     -Math.PI * 0.5;
+      let newTheta = this.loc.y < utils.playerSpawnY() // utils.canvas.height-this.getRadius() 
+                     ? Math.atan2(this.tilt.y-this.neutral.y, this.tilt.x-this.neutral.x) 
+                     : 3 * Math.PI * 0.5;
       let dt = newTheta - this.theta;
       if (dt > Math.PI) dt -= utils.PI_2;
-      this.theta += 0.05 * dt;
+      this.theta += 0.03 * dt;
     }
     if (this.target) this.theta = Math.atan2(this.target.y-this.loc.y, this.target.x-this.loc.x);
     this.theta %= utils.PI_2; // radians
