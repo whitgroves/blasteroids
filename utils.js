@@ -15,8 +15,8 @@ export const BUILD = '2024.03.07.1313';
 export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898
 export const DTAP_TIMEOUT = 300;
 export const LTAP_TIMEOUT = 500; // how long to wait for a long press
-export const TILT_THRESH = 3;
-export const TILT_DEFAULT = 33; // default neutral value for y-tilt
+export const TILT_THRESH = 4;
+export const TILT_DEFAULT = 25; // default neutral value for y-tilt
 
 if (MOBILE && DEBUG) addEventListener('error', (e) => alert('Error: Ln: '+e.lineno+', Col: '+e.colno+': '+e.message));
 
@@ -59,7 +59,7 @@ export const TRIANGLE = [0, (3 * Math.PI / 4), (5 * Math.PI / 4)];
 export const PLAYER_R = MOBILE ? 20 : 16;     // radius
 export const PLAYER_V = MOBILE ? 15 : 12;     // max vel
 export const PLAYER_V_FLOOR = 0.01;           // vel min before damping to 0
-export const PLAYER_A = MOBILE ? 0.08 : 0.02; // acceleration
+export const PLAYER_A = MOBILE ? 0.1 : 0.02; // acceleration
 export const PLAYER_F = 0.02;                 // friction
 export const PLAYER_C = DEBUG ? '#0FF' : '#0AA';
 export const playerSpawnX = () => { return canvas.width * 0.5 }
