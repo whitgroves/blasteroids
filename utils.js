@@ -2,14 +2,23 @@ export const canvas = document.getElementById('game-content');
 export const ctx = canvas.getContext('2d');
 
 export const DEBUG = false;
-export const BUILD = '2024.03.07.1313';
+export const BUILD = '2024.05.25.0434';
 
-// const USER_CONFIG = document.cookie.split(";");
-// const safeGetSetting = (settingName) => {
-//   let setting = USER_CONFIG.find((configSetting) => configSetting.startsWith(settingName));
-//   return setting ? setting.split("=")[1] : "";
-// }
-// let newUser = (safeGetSetting("new_user") !== "false");
+// cookies
+const LOCALDATA = document.cookie.split(";");
+export const getLocalData = (key) => {
+  let data = LOCALDATA.find((entry) => entry.startsWith(key));
+  if (DEBUG) console.log(`Local data requested: ${key}; result: ${(data?"success":"failure")}`);
+  return data ? data.split("=")[1] : null;
+}
+export const setLocalData = (key, data) => {
+  document.cookie = `${key}=${data};`
+  if (DEBUG) console.log(`Local data set: ${key} -> ${data}`);
+}
+export const wipeLocalData = (key) => {
+  document.cookie = `${key}=;` + new Date(0).toUTCString();
+  if (DEBUG) console.log(`Wiped local data for: ${key}`);
+}
 
 // mobile settings
 export const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); // https://stackoverflow.com/a/29509267/3178898

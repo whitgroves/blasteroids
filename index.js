@@ -6,16 +6,23 @@ const arrival = Date.now();
 console.log("Game audio used courtesy of freesound.org and the respective artists. \
 For detailed attribution, view the README at https://github.com/whitgroves/blasteroids.");
 
+let username = utils.getLocalData('username');
+if (username) console.log(username);
+else {
+  username = utils.randomInt(1, 8019876189).toString().padStart(10);
+  utils.setLocalData('username', username);
+}
+
 fetch('./taglines.txt') // https://stackoverflow.com/a/49680132/3178898
   .then(response => response.text())
   .then(data => {
     let taglines = [
-      `now with ${utils.randomInt(0, 255)}% more rng`,
+      `now with ${utils.randomInt(0, 65535).toLocaleString()}% more rng`,
       `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", 
-                                                  "microdosing", "hand sanitizer", "stuffed crust", "free nights and weekends"])}`,
-      utils.randomChoice(data.split('\n'))
+                                                  "microdosing", "hand sanitizer", "stuffed crust", "clicking here",
+                                                  "free nights and weekends", "ファミチキ", "the last best thing"])}`,
+      utils.randomChoice([`welcome back, drone #${username}`, ...data.split('\n')])
     ];
-    // taglines = taglines.concat(data.split('\n'));
     document.getElementById("tagline").innerHTML = utils.randomInt(1, 10**9) === 1 ? "one in a billion" : utils.randomChoice(taglines);
   });
 
@@ -101,11 +108,11 @@ const onFileLoaded = (override=false) => {
 
 const onAudioEvent = (event) => { 
   if (utils.DEBUG) console.log(`AudioFile: ${event.target.id} | ` + 
-                                `WaitTime: ${((Date.now()-arrival)/1000).toFixed(3)}s | ` + 
-                                `Event: ${event.type} | ` +
-                                `NetworkState: ${event.target.networkState} | ` + 
-                                `ReadyState: ${event.target.readyState} | ` + 
-                                `BufferEnd: ${(event.target.duration ? event.target.buffered.end(0) : "NaN")}\n`);
+                               `WaitTime: ${((Date.now()-arrival)/1000).toFixed(3)}s | ` + 
+                               `Event: ${event.type} | ` +
+                               `NetworkState: ${event.target.networkState} | ` + 
+                               `ReadyState: ${event.target.readyState} | ` + 
+                               `BufferEnd: ${(event.target.duration ? event.target.buffered.end(0) : "NaN")}\n`);
   // if (event.type === 'canplaythrough' && event.target.duration > (event.target.buffered.end(0) + 10)) onFileLoaded();
   if (event.type === 'canplaythrough' && event.target.readyState > 3 
       && (!utils.MOBILE || event.target.duration > (event.target.buffered.end(0) + 10))) onFileLoaded();
