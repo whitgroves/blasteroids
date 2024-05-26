@@ -21,9 +21,11 @@ fetch('./taglines.txt') // https://stackoverflow.com/a/49680132/3178898
       `the best thing since ${utils.randomChoice(["avocado toast", "taco tuesday", "energy bars", "pizza on a bagel", 
                                                   "microdosing", "hand sanitizer", "stuffed crust", "clicking here",
                                                   "free nights and weekends", "ファミチキ", "the last best thing"])}`,
-      utils.randomChoice([`welcome back, drone #${username}`, ...data.split('\n')])
+      `welcome back, drone #${username}`,
+      ...data.split('\n')
     ];
-    document.getElementById("tagline").innerHTML = utils.randomInt(1, 10**9) === 1 ? "one in a billion" : utils.randomChoice(taglines);
+    document.getElementById("tagline").innerHTML = utils.randomInt(1, 10**9) === 1 ? "one in a billion (screenshot this)" 
+                                                                                   : utils.randomChoice(taglines);
   });
 
 var game = null;
