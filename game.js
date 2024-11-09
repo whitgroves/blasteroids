@@ -244,7 +244,7 @@ export class Game {
     }
     if (this.score >= 90) {
       this.rank = 'B';
-      commentPool = pacifist ? ['CHOSEN ONE', 'ZEN MODE', 'NAMASTE'] 
+      commentPool = pacifist ? ['GOOD VIBES', 'NAMASTE'] 
                              : ['VERY NICE', 'SOLID', 'RESPECT+', 'WELL DONE'];
     }
     // A (S) rank
@@ -252,12 +252,16 @@ export class Game {
       this.rank = 'A'; 
       commentPool = ['LOCKED IN', 'EAGLE EYE'];
     }
+    if (pacifist && this.score >= 180) {
+      this.rank = 'A';
+      commentPool = ['ENLIGHTENED', 'ZEN MODE'];
+    }
     if (this.score >= 270) {
       this.rank = 'A';
       commentPool = ['TOP NOTCH', 'EXCELLENT', 'A WINNER IS YOU', 'RARE'];
       if (sharpshooter || pacifist || this.score >= 1080) {
         this.rank = 'S';
-        commentPool = pacifist ? ['ENLIGHTENED', 'WE COME IN PEACE', '哲人'] :
+        commentPool = pacifist ? ['CHOSEN ONE', 'WE COME IN PEACE', '哲人'] :
                   sharpshooter ? ['HOT SHOT', 'SHOW OFF', 'LEGEND']
                                : ['SEEK HELP', 'CHILL OUT', 'RAW'];
       }

@@ -290,6 +290,8 @@ export class Upgrade extends Hazard { // not really a hazard but behavior is 90%
   }
   _onDestroy = () => {
     if (this.inBounds() && this.game.player.weapon.level < utils.MAX_WEAPON_LVL) { // skip to the highest available level
+      if (this.game.shots === 0) this.game.score += (5 * this.game.player.weapon.level); 
+      // ^ incentive for pacifist runs; handled here since Hazard.score is only referenced on projectile hit (spaghet)
       this.game.player.weapon.level = Math.min(utils.MAX_WEAPON_LVL, Math.floor(this.game.score * 0.0133) + 1); // * 1/75
       utils.safePlayAudio(utils.UPGRADE_SFX_0);
     }
